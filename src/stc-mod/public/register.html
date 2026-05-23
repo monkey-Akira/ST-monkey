@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <base href="/">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no">
+    <meta name="darkreader-lock">
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" type="text/css" href="css/fontawesome.min.css">
+    <link rel="stylesheet" type="text/css" href="css/solid.min.css">
+    <link rel="stylesheet" type="text/css" href="css/brands.min.css">
+    <link href="webfonts/NotoSans/stylesheet.css" rel="stylesheet">
+    <title>SillyTavern - 注册账号</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Noto Sans', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            background: #080518;
+            color: #eee;
+            padding: 24px 16px;
+        }
+
+        /* ── Video background ── */
+        #stc-bg-video {
+            position: fixed; inset: 0;
+            width: 100%; height: 100%;
+            object-fit: cover; z-index: 0; pointer-events: none;
+        }
+        #stc-bg-overlay {
+            position: fixed; inset: 0; z-index: 1;
+            background: rgba(6, 3, 20, 0.52);
+        }
+        #stc-sakura { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+
+        /* ── Glass card ── */
+        .card {
+            position: relative; z-index: 3;
+            background: rgba(255, 255, 255, 0.055);
+            backdrop-filter: blur(36px);
+            -webkit-backdrop-filter: blur(36px);
+            border: 1px solid rgba(220, 160, 255, 0.22);
+            border-radius: 26px;
+            padding: 44px 38px 38px;
+            width: 100%; max-width: 460px;
+            box-shadow:
+                0 0 0 1px rgba(255, 160, 220, 0.06) inset,
+                0 0 60px rgba(150, 80, 255, 0.16),
+                0 24px 80px rgba(0,0,0,.5);
+            animation: fadeUp .55s cubic-bezier(.22,1,.36,1) both;
+            overflow: hidden;
+        }
+        /* Inner shimmer */
+        .card::before {
+            content: '';
+            position: absolute; inset: 0; border-radius: inherit;
+            background: linear-gradient(135deg,
+                rgba(255,150,220,.05) 0%, transparent 45%,
+                rgba(108,99,255,.04) 100%);
+            pointer-events: none; z-index: 0;
+        }
+        /* Scan lines */
+        .card::after {
+            content: '';
+            position: absolute; inset: 0; border-radius: inherit;
+            background: repeating-linear-gradient(
+                0deg, transparent, transparent 3px,
+                rgba(255,255,255,.007) 3px, rgba(255,255,255,.007) 4px
+            );
+            pointer-events: none; z-index: 0;
+        }
+
+        /* Corner brackets */
+        .card-corner {
+            position: absolute; width: 20px; height: 20px;
+            border-color: rgba(255, 140, 210, 0.5);
+            border-style: solid; z-index: 2; pointer-events: none;
+        }
+        .card-corner.tl { top:14px; left:14px; border-width:2px 0 0 2px; border-radius:4px 0 0 0; }
+        .card-corner.tr { top:14px; right:14px; border-width:2px 2px 0 0; border-radius:0 4px 0 0; }
+        .card-corner.bl { bottom:14px; left:14px; border-width:0 0 2px 2px; border-radius:0 0 0 4px; }
+        .card-corner.br { bottom:14px; right:14px; border-width:0 2px 2px 0; border-radius:0 0 4px 0; }
+        @keyframes fadeUp {
+            from { opacity:0; transform:translateY(28px) scale(.97); }
+            to   { opacity:1; transform:translateY(0) scale(1); }
+        }
+
+        /* ── Card header ── */
+        .card-header { position: relative; z-index: 1; text-align: center; margin-bottom: 32px; }
+        .anime-badge {
+            display: inline-block;
+            font-size: .65em; letter-spacing: .22em; font-weight: 700;
+            color: rgba(255, 170, 230, 0.7); margin-bottom: 14px; text-transform: uppercase;
+        }
+        .anime-badge::before { content: '◈ '; color: rgba(200,130,255,.6); }
+        .anime-badge::after  { content: ' ◈'; color: rgba(200,130,255,.6); }
+        .logo-wrap {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 72px; height: 72px; border-radius: 50%;
+            background: rgba(160,80,255,.12);
+            border: 2px solid rgba(200,130,255,.35);
+            box-shadow: 0 0 36px rgba(200,100,255,.32);
+            font-size: 1.5em; color: #d0a0ff;
+            margin: 0 auto 16px;
+            animation: pulse 3.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%,100% { box-shadow: 0 0 36px rgba(200,100,255,.3); }
+            50%      { box-shadow: 0 0 56px rgba(200,100,255,.55), 0 0 20px rgba(255,140,210,.2); }
+        }
+        .card-header h1 {
+            font-size: 1.55em; font-weight: 800;
+            background: linear-gradient(135deg,#fff 20%,#d8a8ff 60%,#ffb0d8);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+        .card-header p { color: rgba(255,220,245,.35); font-size: .88em; }
+
+        /* ── Loading overlay ── */
+        #loadingOverlay {
+            text-align: center; padding: 24px 0;
+            color: rgba(255,255,255,.4); font-size: .9em;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+
+        /* ── Form ── */
+        #registerForm { display: none; flex-direction: column; gap: 0; }
+
+        .field { margin-bottom: 20px; }
+        .field-label {
+            display: flex; align-items: center; gap: 7px;
+            font-size: .82em; color: rgba(255,210,245,.5);
+            margin-bottom: 7px; font-weight: 500;
+        }
+        .field-label i { width: 14px; color: rgba(200,100,255,.8); }
+        .field-label .req { color: #ff80b0; }
+        .field-label .badge {
+            margin-left: auto; font-size: .74em; padding: 2px 8px; border-radius: 20px;
+            background: rgba(200,80,255,.12); border: 1px solid rgba(200,120,255,.3); color: #d090ff;
+        }
+
+        .field input {
+            position: relative; z-index: 1;
+            width: 100%; padding: 12px 14px;
+            border-radius: 10px; border: 1px solid rgba(200,140,255,.18);
+            background: rgba(255,255,255,.07);
+            color: #eee; font-size: .95em; outline: none;
+            transition: border-color .2s, background .2s;
+        }
+        .field input:focus { border-color: rgba(200,100,255,.55); background: rgba(180,80,255,.08); }
+        .field input.error { border-color: rgba(255,80,120,.6); }
+        .field input:read-only { opacity: .5; cursor: default; }
+        .field-hint { font-size: .76em; color: rgba(255,200,240,.28); margin-top: 5px; }
+
+        .field-row { display: flex; gap: 10px; }
+        .field-row .field { flex: 1; margin-bottom: 0; }
+        .field-row .send-btn { flex-shrink: 0; align-self: flex-end; }
+
+        /* ── Divider ── */
+        .divider {
+            display: flex; align-items: center; gap: 12px;
+            margin: 20px 0 20px; color: rgba(255,255,255,.2); font-size: .78em;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.08);
+        }
+
+        /* ── Section title ── */
+        .section-title {
+            position: relative; z-index: 1;
+            font-size: .78em; font-weight: 700; color: #d090ff;
+            display: flex; align-items: center; gap: 7px;
+            margin-bottom: 14px;
+            padding: 8px 12px; border-radius: 8px;
+            background: rgba(180,80,255,.08); border: 1px solid rgba(200,120,255,.18);
+            letter-spacing: .04em;
+        }
+
+        /* ── Buttons ── */
+        .btn {
+            position: relative; z-index: 1;
+            padding: 11px 18px; border: none; border-radius: 10px;
+            font-size: .9em; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: all .2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #7c6fff, #c060ff, #4a90e2);
+            color: #fff; width: 100%; padding: 14px; font-size: 1em;
+            box-shadow: 0 6px 22px rgba(160,60,255,.4);
+            border: 1px solid rgba(255,150,220,.2);
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(180,80,255,.55); }
+        .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+        .btn-secondary {
+            background: rgba(255,255,255,.07); border: 1px solid rgba(200,140,255,.2);
+            color: rgba(255,210,245,.7); white-space: nowrap;
+        }
+        .btn-secondary:hover:not(:disabled) { background: rgba(200,100,255,.1); transform: translateY(-1px); border-color: rgba(200,140,255,.35); }
+        .btn-secondary:disabled { opacity: .4; cursor: not-allowed; }
+
+        /* ── Messages ── */
+        .msg {
+            font-size: .85em; text-align: center; padding: 11px 14px;
+            border-radius: 9px; display: none; margin-bottom: 14px; line-height: 1.5;
+        }
+        .msg.error   { background: rgba(231,76,60,.1); border: 1px solid rgba(231,76,60,.3); color: #f08080; }
+        .msg.success { background: rgba(46,204,113,.1); border: 1px solid rgba(46,204,113,.3); color: #2ecc71; }
+
+        /* ── Config error banner ── */
+        #configError {
+            display: none; padding: 12px 16px; border-radius: 9px; margin-bottom: 16px;
+            background: rgba(231,76,60,.08); border: 1px solid rgba(231,76,60,.25); color: #f08080;
+            font-size: .84em; text-align: center;
+        }
+        #configError a { color: #f08080; }
+
+        /* ── Password strength bar ── */
+        #pwdStrengthBar {
+            height: 3px; border-radius: 3px; background: rgba(255,255,255,.08);
+            margin-top: 7px; overflow: hidden;
+        }
+        #pwdStrengthFill { height: 100%; width: 0; border-radius: 3px; transition: width .35s, background .35s; }
+
+        /* ── Purchase link button ── */
+        .purchase-link-btn {
+            position: relative; z-index: 1;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 10px 14px; border-radius: 9px; text-decoration: none;
+            font-size: .85em; font-weight: 600;
+            border: 1px solid rgba(243,156,18,.4); background: rgba(243,156,18,.07);
+            color: #f39c12; transition: all .2s; margin-bottom: 16px;
+        }
+        .purchase-link-btn:hover { background: rgba(243,156,18,.14); transform: translateY(-1px); }
+
+        /* ── Footer links ── */
+        .footer-links {
+            position: relative; z-index: 1;
+            text-align: center; margin-top: 20px;
+            font-size: .84em; color: rgba(255,200,240,.3);
+            display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap;
+        }
+        .footer-links a { color: rgba(200,160,255,.75); text-decoration: none; padding: 3px 8px; border-radius: 6px; transition: background .2s; }
+        .footer-links a:hover { background: rgba(200,140,255,.1); }
+        .footer-links .sep { color: rgba(255,255,255,.15); }
+
+        @media (max-width: 480px) {
+            .card { padding: 32px 22px 28px; border-radius: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Adaptive background: image on mobile, video on PC -->
+<script>
+(function(){
+    var mobile = window.matchMedia('(max-width:1023px)').matches ||
+        /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    var el = mobile ? document.createElement('img') : document.createElement('video');
+    el.id = 'stc-bg-video';
+    if (mobile) {
+        el.src = 'https://t.alcy.cc/moemp';
+        el.alt = '';
+    } else {
+        el.autoplay = true; el.muted = true; el.loop = true;
+        el.setAttribute('playsinline','');
+        var s = document.createElement('source');
+        s.src = 'https://t.alcy.cc/acg'; s.type = 'video/mp4';
+        el.appendChild(s);
+    }
+    el.addEventListener('error', function(){
+        var ov = document.getElementById('stc-bg-overlay');
+        if (ov) ov.style.background =
+            'linear-gradient(125deg,#06040f 0%,#180d3a 40%,#0d1b3e 70%,#06040f 100%)';
+    });
+    document.currentScript.insertAdjacentElement('beforebegin', el);
+})();
+</script>
+<div id="stc-bg-overlay"></div>
+
+<canvas id="stc-sakura"></canvas>
+
+<div class="card">
+    <!-- Corner brackets -->
+    <div class="card-corner tl"></div>
+    <div class="card-corner tr"></div>
+    <div class="card-corner bl"></div>
+    <div class="card-corner br"></div>
+
+    <div class="card-header">
+        <div class="anime-badge">Registration</div>
+        <div class="logo-wrap"><i class="fa-solid fa-user-plus"></i></div>
+        <h1>注册账号</h1>
+        <p>创建您的 SillyTavern 账号</p>
+    </div>
+
+    <!-- Loading while fetching site config -->
+    <div id="loadingOverlay">
+        <i class="fa-solid fa-spinner fa-spin"></i> 正在加载注册配置...
+    </div>
+
+    <!-- Config load error -->
+    <div id="configError">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        无法加载注册配置，部分功能可能不可用。
+        <a href="#" onclick="initConfig();return false;">点击重试</a>
+    </div>
+
+    <!-- Registration form (shown after config loads) -->
+    <form id="registerForm" onsubmit="return false;">
+
+        <!-- ── Basic Info ── -->
+        <div class="section-title"><i class="fa-solid fa-user"></i> 基本信息</div>
+
+        <div class="field">
+            <div class="field-label">
+                <i class="fa-solid fa-signature"></i> 用户名 <span class="req">*</span>
+            </div>
+            <input type="text" id="regName" placeholder="用户名（2–32个字符，支持英文/数字/连字符）"
+                   autocomplete="username" minlength="2" maxlength="32" required>
+            <div class="field-hint">用于登录，仅支持英文、数字、连字符</div>
+        </div>
+
+        <div class="field">
+            <div class="field-label">
+                <i class="fa-solid fa-lock"></i> 密码 <span style="font-size:.8em;color:rgba(255,255,255,.3);margin-left:4px">（可选）</span>
+            </div>
+            <input type="password" id="regPassword" placeholder="设置登录密码（可留空）"
+                   autocomplete="new-password">
+            <div id="pwdStrengthBar"><div id="pwdStrengthFill"></div></div>
+        </div>
+
+        <!-- ── Invitation Code (shown when enabled) ── -->
+        <div id="inviteCodeSection" style="display:none">
+            <div class="divider">邀请 / 激活码</div>
+            <div class="section-title"><i class="fa-solid fa-ticket"></i> 邀请 / 激活码</div>
+            <div class="field">
+                <div class="field-label">
+                    <i class="fa-solid fa-key"></i> 激活码 <span class="req">*</span>
+                    <span class="badge">必填</span>
+                </div>
+                <input type="text" id="regInviteCode" placeholder="输入邀请码或激活码" autocomplete="off"
+                       style="font-family:monospace;letter-spacing:.06em;text-transform:uppercase">
+                <div class="field-hint">注册需要有效的激活码，可向管理员获取</div>
+            </div>
+            <div id="purchaseLinkRow" style="display:none">
+                <a id="purchaseLinkBtn" href="#" target="_blank" rel="noopener" class="purchase-link-btn">
+                    <i class="fa-solid fa-cart-shopping"></i> 购买激活码
+                </a>
+            </div>
+        </div>
+
+        <!-- ── Email Verification (shown when enabled) ── -->
+        <div id="emailSection" style="display:none">
+            <div class="divider">邮箱验证</div>
+            <div class="section-title"><i class="fa-solid fa-envelope"></i> 邮箱验证</div>
+            <div class="field">
+                <div class="field-label">
+                    <i class="fa-solid fa-at"></i> 邮箱地址 <span class="req">*</span>
+                </div>
+                <input type="email" id="regEmail" placeholder="输入您的邮箱地址" autocomplete="email">
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <div class="field-label">
+                        <i class="fa-solid fa-shield-halved"></i> 验证码 <span class="req">*</span>
+                    </div>
+                    <input type="text" id="regVerCode" placeholder="6位验证码" maxlength="6"
+                           style="font-family:monospace;letter-spacing:.15em;font-size:1.05em">
+                </div>
+                <div class="send-btn">
+                    <button type="button" id="sendCodeBtn" class="btn btn-secondary" onclick="sendVerification()">
+                        <i class="fa-solid fa-paper-plane"></i> 发送
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="msg error"   id="errorMsg"></div>
+        <div class="msg success" id="successMsg"></div>
+
+        <!-- Submit -->
+        <div style="height:12px"></div>
+        <button type="submit" class="btn btn-primary" id="registerBtn">
+            <i class="fa-solid fa-user-plus"></i> 创建账号
+        </button>
+    </form>
+
+    <div class="footer-links">
+        已有账号？<a href="/login">去登录</a>
+        <span class="sep">·</span>
+        <a href="/">返回首页</a>
+    </div>
+</div>
+
+<script>
+let stcConfig = {};
+let sendCooldown = false;
+
+async function initConfig() {
+    document.getElementById('loadingOverlay').style.display = 'flex';
+    document.getElementById('registerForm').style.display = 'none';
+    document.getElementById('configError').style.display = 'none';
+    try {
+        const resp = await fetch('/api/stc/public-config/public-pages');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        stcConfig = await resp.json();
+    } catch (e) {
+        console.warn('[STC] Config fetch failed:', e.message);
+        stcConfig = {};
+        document.getElementById('configError').style.display = '';
+    }
+    document.getElementById('loadingOverlay').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'flex';
+
+    if (stcConfig.enableInvitationCodes) {
+        document.getElementById('inviteCodeSection').style.display = '';
+        if (stcConfig.purchaseLink) {
+            document.getElementById('purchaseLinkBtn').href = stcConfig.purchaseLink;
+            document.getElementById('purchaseLinkRow').style.display = '';
+        }
+    }
+    if (stcConfig.enableEmailVerification) {
+        document.getElementById('emailSection').style.display = '';
+    }
+
+    const params = new URLSearchParams(location.search);
+    const oauthData = params.get('oauth');
+    if (oauthData) {
+        try {
+            const data = JSON.parse(atob(oauthData));
+            const nameInput = document.getElementById('regName');
+            nameInput.value = data.username || '';
+            nameInput.readOnly = true;
+            document.getElementById('regPassword').closest('.field').style.display = 'none';
+            window._oauthData = data;
+        } catch {}
+    }
+}
+
+/* Password strength */
+document.getElementById('regPassword').addEventListener('input', function() {
+    const pw = this.value;
+    const fill = document.getElementById('pwdStrengthFill');
+    if (!pw) { fill.style.width = '0'; return; }
+    let score = 0;
+    if (pw.length >= 6)  score++;
+    if (pw.length >= 10) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    const colors = ['#e74c3c','#e74c3c','#f39c12','#f39c12','#2ecc71','#2ecc71'];
+    fill.style.width   = (score / 5 * 100) + '%';
+    fill.style.background = colors[score] || '#e74c3c';
+});
+
+/* Auto-uppercase invite code */
+document.getElementById('regInviteCode')?.addEventListener('input', function() {
+    const pos = this.selectionStart;
+    this.value = this.value.toUpperCase();
+    this.setSelectionRange(pos, pos);
+});
+
+async function sendVerification() {
+    if (sendCooldown) return;
+    const email = document.getElementById('regEmail').value.trim();
+    const name  = document.getElementById('regName').value.trim();
+    if (!email) { showError('请先填写邮箱地址'); return; }
+    if (!name)  { showError('请先填写用户名'); return; }
+    sendCooldown = true;
+    const btn = document.getElementById('sendCodeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    try {
+        const resp = await fetch('/api/stc/users/send-verification', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, userName: name }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+            showSuccess('验证码已发送至 ' + email);
+            let sec = 60;
+            const timer = setInterval(() => {
+                btn.innerHTML = `<i class="fa-solid fa-clock"></i> ${sec}s`;
+                if (--sec < 0) {
+                    clearInterval(timer);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> 发送';
+                    sendCooldown = false;
+                }
+            }, 1000);
+        } else {
+            showError(data.error || '发送失败，请稍后重试');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> 发送';
+            sendCooldown = false;
+        }
+    } catch {
+        showError('网络错误，请重试');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> 发送';
+        sendCooldown = false;
+    }
+}
+
+document.getElementById('registerForm').addEventListener('submit', async () => {
+    clearMessages();
+    const name             = document.getElementById('regName').value.trim();
+    const password         = document.getElementById('regPassword').value;
+    const inviteCode       = document.getElementById('regInviteCode').value.trim();
+    const email            = document.getElementById('regEmail').value.trim();
+    const verificationCode = document.getElementById('regVerCode').value.trim();
+
+    if (!name || name.length < 2) { showError('用户名至少需要2个字符'); return; }
+    if (stcConfig.enableInvitationCodes && !inviteCode) {
+        showError('请输入激活码（注册必须填写）');
+        document.getElementById('regInviteCode').focus();
+        return;
+    }
+    if (stcConfig.enableEmailVerification) {
+        if (!email) { showError('请填写邮箱地址'); return; }
+        if (!verificationCode) { showError('请填写邮箱验证码'); return; }
+    }
+
+    const btn = document.getElementById('registerBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 注册中...';
+
+    if (window._oauthData) {
+        try {
+            const resp = await fetch('/api/stc/oauth/complete-registration', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...window._oauthData, inviteCode }),
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showSuccess('注册成功！正在跳转...');
+                setTimeout(() => { window.location.href = '/'; }, 1200);
+            } else {
+                showError(data.error || '注册失败');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> 创建账号';
+            }
+        } catch {
+            showError('网络错误，请稍后重试');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> 创建账号';
+        }
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/stc/users/register', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name, password,
+                inviteCode:       inviteCode       || undefined,
+                email:            email            || undefined,
+                verificationCode: verificationCode || undefined,
+            }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const expMsg = data.expiresAt
+                ? `账户有效期至 ${new Date(data.expiresAt).toLocaleDateString('zh-CN')}，`
+                : '';
+            showSuccess(`注册成功！${expMsg}正在跳转到登录页...`);
+            setTimeout(() => { window.location.href = '/login'; }, 2000);
+        } else {
+            showError(data.error || '注册失败，请检查填写内容');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> 创建账号';
+        }
+    } catch {
+        showError('网络错误，请稍后重试');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> 创建账号';
+    }
+});
+
+function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg; el.className = 'msg error'; el.style.display = '';
+    document.getElementById('successMsg').style.display = 'none';
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function showSuccess(msg) {
+    const el = document.getElementById('successMsg');
+    el.textContent = msg; el.className = 'msg success'; el.style.display = '';
+    document.getElementById('errorMsg').style.display = 'none';
+}
+function clearMessages() {
+    document.getElementById('errorMsg').style.display = 'none';
+    document.getElementById('successMsg').style.display = 'none';
+}
+
+initConfig();
+
+/* ── Sakura particles ── */
+(function() {
+    const c = document.getElementById('stc-sakura');
+    const ctx = c.getContext('2d');
+    const colors = ['#ffb7c5','#ffc8d4','#e8c4f8','#c4d8ff','#ffd8f0','#e0b8ff'];
+    const petals = [];
+    function resize() { c.width = innerWidth; c.height = innerHeight; }
+    resize(); window.addEventListener('resize', resize);
+    for (let i = 0; i < 36; i++) {
+        petals.push({
+            x: Math.random() * c.width, y: Math.random() * c.height,
+            r: Math.random() * 5.5 + 2,
+            vx: (Math.random() - .5) * .9, vy: Math.random() * 1.1 + .35,
+            rot: Math.random() * Math.PI * 2, vr: (Math.random() - .5) * .04,
+            a: Math.random() * .42 + .1,
+            color: colors[Math.floor(Math.random() * colors.length)],
+        });
+    }
+    function drawPetal(p) {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = p.a;
+        ctx.beginPath();
+        ctx.moveTo(0, -p.r);
+        ctx.bezierCurveTo(p.r*.8, -p.r*.8, p.r, p.r*.5, 0, p.r);
+        ctx.bezierCurveTo(-p.r, p.r*.5, -p.r*.8, -p.r*.8, 0, -p.r);
+        ctx.fillStyle = p.color; ctx.fill(); ctx.restore();
+    }
+    function animate() {
+        ctx.clearRect(0, 0, c.width, c.height);
+        petals.forEach(p => {
+            drawPetal(p); p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+            p.vx += (Math.random() - .5) * .015;
+            p.vx = Math.max(-1.5, Math.min(1.5, p.vx));
+            if (p.y > c.height + 12) { p.y = -12; p.x = Math.random() * c.width; }
+        });
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+
+</script>
+</body>
+</html>

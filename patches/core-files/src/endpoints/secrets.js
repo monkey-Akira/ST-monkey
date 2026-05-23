@@ -1,0 +1,855 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+import express from 'express';
+import { sync as writeFileAtomicSync } from 'write-file-atomic';
+import { color, getConfigValue, uuidv4 } from '../util.js';
+
+// ───────────────────────────────────────────────────────────────
+// STC-MOD: API 密钥保险箱适配层导入开始
+// ───────────────────────────────────────────────────────────────
+import {
+    VaultLockedError,
+    VaultRequiredError,
+    decryptSecretValue,
+    encryptSecretValue,
+    getVaultStatus,
+    initializeVault,
+    isEncryptedVaultValue,
+    isVaultProtectedKey,
+    isVaultRequiredForApiKeys,
+    resetVault,
+} from '../stc-mod/services/privacy-vault.js';
+// ───────────────────────────────────────────────────────────────
+// STC-MOD: API 密钥保险箱适配层导入结束
+// ───────────────────────────────────────────────────────────────
+
+export const SECRETS_FILE = 'secrets.json';
+export const SECRET_KEYS = {
+    _MIGRATED: '_migrated',
+    HORDE: 'api_key_horde',
+    MANCER: 'api_key_mancer',
+    VLLM: 'api_key_vllm',
+    APHRODITE: 'api_key_aphrodite',
+    TABBY: 'api_key_tabby',
+    OPENAI: 'api_key_openai',
+    NOVEL: 'api_key_novel',
+    CLAUDE: 'api_key_claude',
+    DEEPL: 'deepl',
+    LIBRE: 'libre',
+    LIBRE_URL: 'libre_url',
+    LINGVA_URL: 'lingva_url',
+    OPENROUTER: 'api_key_openrouter',
+    AI21: 'api_key_ai21',
+    ONERING_URL: 'oneringtranslator_url',
+    DEEPLX_URL: 'deeplx_url',
+    MAKERSUITE: 'api_key_makersuite',
+    VERTEXAI: 'api_key_vertexai',
+    SERPAPI: 'api_key_serpapi',
+    TOGETHERAI: 'api_key_togetherai',
+    MISTRALAI: 'api_key_mistralai',
+    CUSTOM: 'api_key_custom',
+    OOBA: 'api_key_ooba',
+    INFERMATICAI: 'api_key_infermaticai',
+    DREAMGEN: 'api_key_dreamgen',
+    NOMICAI: 'api_key_nomicai',
+    KOBOLDCPP: 'api_key_koboldcpp',
+    LLAMACPP: 'api_key_llamacpp',
+    COHERE: 'api_key_cohere',
+    PERPLEXITY: 'api_key_perplexity',
+    GROQ: 'api_key_groq',
+    AZURE_TTS: 'api_key_azure_tts',
+    FEATHERLESS: 'api_key_featherless',
+    HUGGINGFACE: 'api_key_huggingface',
+    STABILITY: 'api_key_stability',
+    CUSTOM_OPENAI_TTS: 'api_key_custom_openai_tts',
+    TAVILY: 'api_key_tavily',
+    CHUTES: 'api_key_chutes',
+    ELECTRONHUB: 'api_key_electronhub',
+    NANOGPT: 'api_key_nanogpt',
+    BFL: 'api_key_bfl',
+    COMFY_RUNPOD: 'api_key_comfy_runpod',
+    FALAI: 'api_key_falai',
+    GENERIC: 'api_key_generic',
+    DEEPSEEK: 'api_key_deepseek',
+    SERPER: 'api_key_serper',
+    AIMLAPI: 'api_key_aimlapi',
+    XAI: 'api_key_xai',
+    FIREWORKS: 'api_key_fireworks',
+    VERTEXAI_SERVICE_ACCOUNT: 'vertexai_service_account_json',
+    MINIMAX: 'api_key_minimax',
+    MINIMAX_GROUP_ID: 'minimax_group_id',
+    MOONSHOT: 'api_key_moonshot',
+    COMETAPI: 'api_key_cometapi',
+    AZURE_OPENAI: 'api_key_azure_openai',
+    ZAI: 'api_key_zai',
+    SILICONFLOW: 'api_key_siliconflow',
+    ELEVENLABS: 'api_key_elevenlabs',
+    POLLINATIONS: 'api_key_pollinations',
+    VOLCENGINE_APP_ID: 'volcengine_app_id',
+    VOLCENGINE_ACCESS_KEY: 'volcengine_access_key',
+    WORKERS_AI: 'api_key_workers_ai',
+};
+
+/**
+ * @typedef {object} SecretValue
+ * @property {string} id The unique identifier for the secret
+ * @property {string} value The secret value
+ * @property {string} label The label for the secret
+ * @property {boolean} active Whether the secret is currently active
+ */
+
+/**
+ * @typedef {object} SecretState
+ * @property {string} id The unique identifier for the secret
+ * @property {string} value The secret value, masked for security
+ * @property {string} label The label for the secret
+ * @property {boolean} active Whether the secret is currently active
+ */
+
+/**
+ * @typedef {Record<string, SecretState[]|null>} SecretStateMap
+ */
+
+/**
+ * @typedef {{[key: string]: SecretValue[]}} SecretKeys
+ * @typedef {{[key: string]: string}} FlatSecretKeys
+ */
+
+// These are the keys that are safe to expose, even if allowKeysExposure is false
+const EXPORTABLE_KEYS = [
+    SECRET_KEYS.LIBRE_URL,
+    SECRET_KEYS.LINGVA_URL,
+    SECRET_KEYS.ONERING_URL,
+    SECRET_KEYS.DEEPLX_URL,
+];
+
+export const allowKeysExposure = !!getConfigValue('allowKeysExposure', false, 'boolean');
+
+/**
+ * SecretManager class to handle all secret operations
+ */
+export class SecretManager {
+    /**
+     * @param {import('../users.js').UserDirectoryList} directories
+     */
+    constructor(directories) {
+        this.directories = directories;
+        this.filePath = path.join(directories.root, SECRETS_FILE);
+        this.defaultSecrets = {};
+    }
+
+    /**
+     * Ensures the secrets file exists, creating an empty one if necessary
+     * @private
+     */
+    _ensureSecretsFile() {
+        if (!fs.existsSync(this.filePath)) {
+            writeFileAtomicSync(this.filePath, JSON.stringify(this.defaultSecrets), 'utf-8');
+        }
+    }
+
+    /**
+     * Reads and parses the secrets file
+     * @private
+     * @returns {SecretKeys}
+     */
+    _readSecretsFile() {
+        this._ensureSecretsFile();
+        const fileContents = fs.readFileSync(this.filePath, 'utf-8');
+        return /** @type {SecretKeys} */ (JSON.parse(fileContents));
+    }
+
+    /**
+     * Writes secrets to the file atomically
+     * @private
+     * @param {SecretKeys} secrets
+     */
+    _writeSecretsFile(secrets) {
+        writeFileAtomicSync(this.filePath, JSON.stringify(secrets, null, 4), 'utf-8');
+    }
+
+    /**
+     * Deactivates all secrets for a given key
+     * @private
+     * @param {SecretValue[]} secretArray
+     */
+    _deactivateAllSecrets(secretArray) {
+        secretArray.forEach(secret => {
+            secret.active = false;
+        });
+    }
+
+    /**
+     * Validates that the secret key exists and has valid structure
+     * @private
+     * @param {SecretKeys} secrets
+     * @param {string} key
+     * @returns {boolean}
+     */
+    _validateSecretKey(secrets, key) {
+        return Object.hasOwn(secrets, key) && Array.isArray(secrets[key]);
+    }
+
+    /**
+     * Masks a secret value with asterisks in the middle
+     * @param {string} value The secret value to mask
+     * @param {string} key The secret key
+     * @returns {string} A masked version of the value for peeking
+     */
+    getMaskedValue(value, key) {
+        // No masking if exposure is allowed
+        if (allowKeysExposure || EXPORTABLE_KEYS.includes(key)) {
+            return value;
+        }
+        const threshold = 10;
+        const exposedChars = 3;
+        const placeholder = '*';
+        if (value.length <= threshold) {
+            return placeholder.repeat(threshold);
+        }
+        const visibleEnd = value.slice(-exposedChars);
+        const maskedMiddle = placeholder.repeat(threshold - exposedChars);
+        return `${maskedMiddle}${visibleEnd}`;
+    }
+
+    /**
+     * Helper method to dispatch vault errors correctly.
+     */
+    sendVaultError(response, error) {
+        if (error instanceof VaultLockedError) {
+            return response.status(423).send({ error: true, code: 'VAULT_LOCKED', message: error.message });
+        }
+        if (error instanceof VaultRequiredError) {
+            return response.status(428).send({ error: true, code: 'VAULT_REQUIRED', message: error.message });
+        }
+        return response.status(500).send({ error: true });
+    }
+
+    /**
+     * Helper to enable vault and encrypt existing keys
+     * @param {string} passphrase 
+     * @returns {Promise<number>} Number of encrypted keys
+     */
+    async enableVault(passphrase) {
+        const isNew = initializeVault(this.directories, passphrase);
+        if (!isNew) {
+            return 0; // Already enabled
+        }
+
+        let encryptedCount = 0;
+        const secrets = this._readSecretsFile();
+        let hasChanges = false;
+
+        for (const [key, secretArray] of Object.entries(secrets)) {
+            if (isVaultProtectedKey(key) && Array.isArray(secretArray)) {
+                for (const secret of secretArray) {
+                    if (typeof secret.value === 'string' && secret.value !== '') {
+                        secret.value = encryptSecretValue(this.directories, secret.value);
+                        encryptedCount++;
+                        hasChanges = true;
+                    }
+                }
+            }
+        }
+
+        if (hasChanges) {
+            this._writeSecretsFile(secrets);
+        }
+
+        return encryptedCount;
+    }
+
+    /**
+     * Resets the user's vault:
+     * - removes the on-disk vault record (salt + verifier),
+     * - clears the in-memory derived key,
+     * - deletes every encrypted secret entry from secrets.json (they would
+     *   otherwise be unreadable forever since we no longer have the passphrase).
+     * Plaintext entries are preserved.
+     *
+     * @returns {{ existed: boolean, removedKeys: number }}
+     */
+    resetVaultAndClearEncryptedKeys() {
+        const { existed } = resetVault(this.directories);
+
+        // Even if the vault wasn't enabled, proactively scrub any stale
+        // encrypted entries that might exist in secrets.json.
+        let removedKeys = 0;
+
+        if (fs.existsSync(this.filePath)) {
+            const secrets = this._readSecretsFile();
+            let hasChanges = false;
+
+            for (const [key, secretArray] of Object.entries(secrets)) {
+                if (!Array.isArray(secretArray)) continue;
+
+                const kept = secretArray.filter(s => {
+                    const encrypted = isEncryptedVaultValue(s.value);
+                    if (encrypted) removedKeys++;
+                    return !encrypted;
+                });
+
+                if (kept.length !== secretArray.length) {
+                    hasChanges = true;
+                    if (kept.length === 0) {
+                        delete secrets[key];
+                    } else {
+                        // If we dropped the active one, promote the first remaining.
+                        if (!kept.some(s => s.active)) {
+                            kept[0].active = true;
+                        }
+                        secrets[key] = kept;
+                    }
+                }
+            }
+
+            if (hasChanges) {
+                this._writeSecretsFile(secrets);
+            }
+        }
+
+        return { existed, removedKeys };
+    }
+
+    /**
+     * Writes a secret to the secrets file
+     * @param {string} key Secret key
+     * @param {string} value Secret value
+     * @param {string} label Label for the secret
+     * @returns {string} The ID of the newly created secret
+     */
+    writeSecret(key, value, label = 'Unlabeled') {
+        // ───────────────────────────────────────────────────────────────
+        // STC-MOD: API 密钥保险箱写入拦截开始
+        // ───────────────────────────────────────────────────────────────
+        if (isVaultProtectedKey(key)) {
+            const status = getVaultStatus(this.directories);
+            if (status.enabled) {
+                value = encryptSecretValue(this.directories, value);
+            } else if (status.requireForApiKeys) {
+                throw new VaultRequiredError();
+            }
+        }
+        // ───────────────────────────────────────────────────────────────
+        // STC-MOD: API 密钥保险箱写入拦截结束
+        // ───────────────────────────────────────────────────────────────
+
+        const secrets = this._readSecretsFile();
+
+        if (!Array.isArray(secrets[key])) {
+            secrets[key] = [];
+        }
+
+        this._deactivateAllSecrets(secrets[key]);
+
+        const secret = {
+            id: uuidv4(),
+            value: value,
+            label: label,
+            active: true,
+        };
+        secrets[key].push(secret);
+
+        this._writeSecretsFile(secrets);
+        return secret.id;
+    }
+
+    /**
+     * Deletes a secret from the secrets file by its ID
+     * @param {string} key Secret key
+     * @param {string?} id Secret ID to delete
+     */
+    deleteSecret(key, id) {
+        if (!fs.existsSync(this.filePath)) {
+            return;
+        }
+
+        const secrets = this._readSecretsFile();
+
+        if (!this._validateSecretKey(secrets, key)) {
+            return;
+        }
+
+        const secretArray = secrets[key];
+        const targetIndex = secretArray.findIndex(s => id ? s.id === id : s.active);
+
+        // Delete the secret if found
+        if (targetIndex !== -1) {
+            secretArray.splice(targetIndex, 1);
+        }
+
+        // Reactivate the first secret if none are active
+        if (secretArray.length && !secretArray.some(s => s.active)) {
+            secretArray[0].active = true;
+        }
+
+        // Remove the key if no secrets left
+        if (secretArray.length === 0) {
+            delete secrets[key];
+        }
+
+        this._writeSecretsFile(secrets);
+    }
+
+    /**
+     * Reads the active secret value for a given key
+     * @param {string} key Secret key
+     * @param {string?} id ID of the secret to read (optional)
+     * @param {boolean} throwOnLocked If true, throws VaultLockedError instead of returning empty string
+     * @returns {string} Secret value or empty string if not found
+     */
+    readSecret(key, id, throwOnLocked = false) {
+        if (!fs.existsSync(this.filePath)) {
+            return '';
+        }
+
+        const secrets = this._readSecretsFile();
+        const secretArray = secrets[key];
+
+        if (Array.isArray(secretArray) && secretArray.length > 0) {
+            const activeSecret = secretArray.find(s => id ? s.id === id : s.active);
+            let value = activeSecret?.value || '';
+
+            // ───────────────────────────────────────────────────────────────
+            // STC-MOD: API 密钥保险箱解密开始
+            // ───────────────────────────────────────────────────────────────
+            try {
+                if (isEncryptedVaultValue(value)) {
+                    value = decryptSecretValue(this.directories, value);
+                }
+            } catch (error) {
+                if (error instanceof VaultLockedError) {
+                    if (throwOnLocked) {
+                        throw error;
+                    }
+                    return ''; // Safe fallback for locked vault when reading silently
+                }
+                console.error('[STC-MOD] Vault decryption error:', error.message);
+                return '';
+            }
+            // ───────────────────────────────────────────────────────────────
+            // STC-MOD: API 密钥保险箱解密结束
+            // ───────────────────────────────────────────────────────────────
+
+            return value;
+        }
+
+        return '';
+    }
+
+    /**
+     * Activates a specific secret by ID for a given key
+     * @param {string} key Secret key to rotate
+     * @param {string} id ID of the secret to activate
+     */
+    rotateSecret(key, id) {
+        if (!fs.existsSync(this.filePath)) {
+            return;
+        }
+
+        const secrets = this._readSecretsFile();
+
+        if (!this._validateSecretKey(secrets, key)) {
+            return;
+        }
+
+        const secretArray = secrets[key];
+        const targetIndex = secretArray.findIndex(s => s.id === id);
+
+        if (targetIndex === -1) {
+            console.warn(`Secret with ID ${id} not found for key ${key}`);
+            return;
+        }
+
+        this._deactivateAllSecrets(secretArray);
+        secretArray[targetIndex].active = true;
+
+        this._writeSecretsFile(secrets);
+    }
+
+    /**
+     * Renames a secret by its ID
+     * @param {string} key Secret key to rename
+     * @param {string} id ID of the secret to rename
+     * @param {string} label New label for the secret
+     */
+    renameSecret(key, id, label) {
+        const secrets = this._readSecretsFile();
+
+        if (!this._validateSecretKey(secrets, key)) {
+            return;
+        }
+
+        const secretArray = secrets[key];
+        const targetIndex = secretArray.findIndex(s => s.id === id);
+
+        if (targetIndex === -1) {
+            console.warn(`Secret with ID ${id} not found for key ${key}`);
+            return;
+        }
+
+        secretArray[targetIndex].label = label;
+        this._writeSecretsFile(secrets);
+    }
+
+    /**
+     * Gets the state of all secrets (whether they exist or not)
+     * @returns {SecretStateMap} Secret state
+     */
+    getSecretState() {
+        const secrets = this._readSecretsFile();
+        /** @type {SecretStateMap} */
+        const state = {};
+
+        for (const key of Object.values(SECRET_KEYS)) {
+            // Skip migration marker
+            if (key === SECRET_KEYS._MIGRATED) {
+                continue;
+            }
+            const value = secrets[key];
+            if (value && Array.isArray(value) && value.length > 0) {
+                state[key] = value.map(secret => {
+                    // ───────────────────────────────────────────────────────────────
+                    // STC-MOD: API 密钥保险箱前端显示屏蔽开始
+                    // ───────────────────────────────────────────────────────────────
+                    const isEncrypted = isEncryptedVaultValue(secret.value);
+                    const displayValue = isEncrypted 
+                        ? '*******' // Hide real encrypted payload from UI
+                        : this.getMaskedValue(secret.value, key);
+                    
+                    return {
+                        id: secret.id,
+                        value: displayValue,
+                        label: secret.label,
+                        active: secret.active,
+                        encrypted: isEncrypted, // Pass this flag to UI so it knows it's a vault key
+                    };
+                    // ───────────────────────────────────────────────────────────────
+                    // STC-MOD: API 密钥保险箱前端显示屏蔽结束
+                    // ───────────────────────────────────────────────────────────────
+                });
+            } else {
+                // No secrets for this key
+                state[key] = null;
+            }
+        }
+
+        return state;
+    }
+
+    /**
+     * Gets all secrets (for admin viewing)
+     * @returns {SecretKeys} All secrets
+     */
+    getAllSecrets() {
+        return this._readSecretsFile();
+    }
+
+    /**
+     * Migrates legacy flat secrets format to new format
+     */
+    migrateFlatSecrets() {
+        if (!fs.existsSync(this.filePath)) {
+            return;
+        }
+
+        const fileContents = fs.readFileSync(this.filePath, 'utf8');
+        const secrets = /** @type {FlatSecretKeys} */ (JSON.parse(fileContents));
+        const values = Object.values(secrets);
+
+        // Check if already migrated
+        if (secrets[SECRET_KEYS._MIGRATED] || values.length === 0 || values.some(v => Array.isArray(v))) {
+            return;
+        }
+
+        /** @type {SecretKeys} */
+        const migratedSecrets = {};
+
+        for (const [key, value] of Object.entries(secrets)) {
+            if (typeof value === 'string' && value.trim()) {
+                migratedSecrets[key] = [{
+                    id: uuidv4(),
+                    value: value,
+                    label: key,
+                    active: true,
+                }];
+            }
+        }
+
+        // Mark as migrated
+        migratedSecrets[SECRET_KEYS._MIGRATED] = [];
+
+        // Save backup of the old secrets file
+        const backupFilePath = path.join(this.directories.backups, `secrets_migration_${Date.now()}.json`);
+        fs.cpSync(this.filePath, backupFilePath);
+
+        this._writeSecretsFile(migratedSecrets);
+        console.info(color.green('Secrets migrated successfully, old secrets backed up to:'), backupFilePath);
+    }
+}
+
+//#region Backwards compatibility
+/**
+ * Writes a secret to the secrets file
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @param {string} key Secret key
+ * @param {string} value Secret value
+ */
+export function writeSecret(directories, key, value) {
+    return new SecretManager(directories).writeSecret(key, value);
+}
+
+/**
+ * Deletes a secret from the secrets file
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @param {string} key Secret key
+ */
+export function deleteSecret(directories, key) {
+    return new SecretManager(directories).deleteSecret(key, null);
+}
+
+/**
+ * Reads a secret from the secrets file
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @param {string} key Secret key
+ * @param {string?} id Secret ID (optional)
+ * @returns {string} Secret value
+ */
+export function readSecret(directories, key, id = null) {
+    return new SecretManager(directories).readSecret(key, id);
+}
+
+/**
+ * Reads the secret state from the secrets file
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @returns {Record<string, boolean>} Secret state
+ */
+export function readSecretState(directories) {
+    const state = new SecretManager(directories).getSecretState();
+    const result = /** @type {Record<string, boolean>} */ ({});
+    for (const key of Object.values(SECRET_KEYS)) {
+        // Skip migration marker
+        if (key === SECRET_KEYS._MIGRATED) {
+            continue;
+        }
+        result[key] = Array.isArray(state[key]) && state[key].length > 0;
+    }
+    return result;
+}
+
+/**
+ * Reads all secrets from the secrets file
+ * @param {import('../users.js').UserDirectoryList} directories User directories
+ * @returns {Record<string, string>} Secrets
+ */
+export function getAllSecrets(directories) {
+    const secrets = new SecretManager(directories).getAllSecrets();
+    const result = /** @type {Record<string, string>} */ ({});
+    for (const [key, values] of Object.entries(secrets)) {
+        // Skip migration marker
+        if (key === SECRET_KEYS._MIGRATED) {
+            continue;
+        }
+        if (Array.isArray(values) && values.length > 0) {
+            const activeSecret = values.find(secret => secret.active);
+            if (activeSecret) {
+                result[key] = activeSecret.value;
+            }
+        }
+    }
+    return result;
+}
+//#endregion
+
+/**
+ * Migrates legacy flat secrets format to the new format for all user directories
+ * @param {import('../users.js').UserDirectoryList[]} directoriesList User directories
+ */
+export function migrateFlatSecrets(directoriesList) {
+    for (const directories of directoriesList) {
+        try {
+            const manager = new SecretManager(directories);
+            manager.migrateFlatSecrets();
+        } catch (error) {
+            console.warn(color.red(`Failed to migrate secrets for ${directories.root}:`), error);
+        }
+    }
+}
+
+export const router = express.Router();
+
+router.post('/write', (request, response) => {
+    try {
+        const { key, value, label } = request.body;
+
+        if (!key || typeof value !== 'string') {
+            return response.status(400).send('Invalid key or value');
+        }
+
+        const manager = new SecretManager(request.user.directories);
+        const id = manager.writeSecret(key, value, label);
+
+        return response.send({ id });
+    } catch (error) {
+        // ───────────────────────────────────────────────────────────────
+        // STC-MOD: 捕获保险箱错误开始
+        // ───────────────────────────────────────────────────────────────
+        if (error instanceof VaultLockedError || error instanceof VaultRequiredError) {
+            const manager = new SecretManager(request.user.directories);
+            return manager.sendVaultError(response, error);
+        }
+        // ───────────────────────────────────────────────────────────────
+        // STC-MOD: 捕获保险箱错误结束
+        // ───────────────────────────────────────────────────────────────
+        console.error('Error writing secret:', error);
+        return response.sendStatus(500);
+    }
+});
+
+router.post('/read', (request, response) => {
+    try {
+        const manager = new SecretManager(request.user.directories);
+        const state = manager.getSecretState();
+        return response.send(state);
+    } catch (error) {
+        // ───────────────────────────────────────────────────────────────
+        // STC-MOD: 捕获保险箱错误开始
+        // ───────────────────────────────────────────────────────────────
+        if (error instanceof VaultLockedError) {
+            const manager = new SecretManager(request.user.directories);
+            return manager.sendVaultError(response, error);
+        }
+        // ───────────────────────────────────────────────────────────────
+        // STC-MOD: 捕获保险箱错误结束
+        // ───────────────────────────────────────────────────────────────
+        console.error('Error reading secret state:', error);
+        return response.send({});
+    }
+});
+
+router.post('/view', (request, response) => {
+    try {
+        if (!allowKeysExposure) {
+            console.error('secrets.json could not be viewed unless allowKeysExposure in config.yaml is set to true');
+            return response.sendStatus(403);
+        }
+
+        const secrets = getAllSecrets(request.user.directories);
+
+        if (!secrets) {
+            return response.sendStatus(404);
+        }
+
+        return response.send(secrets);
+    } catch (error) {
+        // ───────────────────────────────────────────────────────────────
+        // STC-MOD: 捕获保险箱错误开始
+        // ───────────────────────────────────────────────────────────────
+        if (error instanceof VaultLockedError) {
+            const manager = new SecretManager(request.user.directories);
+            return manager.sendVaultError(response, error);
+        }
+        // ───────────────────────────────────────────────────────────────
+        // STC-MOD: 捕获保险箱错误结束
+        // ───────────────────────────────────────────────────────────────
+        console.error('Error viewing secrets:', error);
+        return response.sendStatus(500);
+    }
+});
+
+router.post('/find', (request, response) => {
+    try {
+        const { key, id } = request.body;
+
+        if (!key) {
+            return response.status(400).send('Key is required');
+        }
+
+        if (!allowKeysExposure && !EXPORTABLE_KEYS.includes(key)) {
+            console.error('Cannot fetch secrets unless allowKeysExposure in config.yaml is set to true');
+            return response.sendStatus(403);
+        }
+
+        const manager = new SecretManager(request.user.directories);
+        const state = manager.getSecretState();
+
+        if (!state[key]) {
+            return response.sendStatus(404);
+        }
+
+        const secretValue = manager.readSecret(key, id, true); // true = throwOnLocked
+        return response.send({ value: secretValue });
+    } catch (error) {
+        // ───────────────────────────────────────────────────────────────
+        // STC-MOD: 捕获保险箱错误开始
+        // ───────────────────────────────────────────────────────────────
+        if (error instanceof VaultLockedError) {
+            const manager = new SecretManager(request.user.directories);
+            return manager.sendVaultError(response, error);
+        }
+        // ───────────────────────────────────────────────────────────────
+        // STC-MOD: 捕获保险箱错误结束
+        // ───────────────────────────────────────────────────────────────
+        console.error('Error finding secret:', error);
+        return response.sendStatus(500);
+    }
+});
+
+router.post('/delete', (request, response) => {
+    try {
+        const { key, id } = request.body;
+
+        if (!key) {
+            return response.status(400).send('Key and ID are required');
+        }
+
+        const manager = new SecretManager(request.user.directories);
+        manager.deleteSecret(key, id);
+
+        return response.sendStatus(204);
+    } catch (error) {
+        console.error('Error deleting secret:', error);
+        return response.sendStatus(500);
+    }
+});
+
+router.post('/rotate', (request, response) => {
+    try {
+        const { key, id } = request.body;
+
+        if (!key || !id) {
+            return response.status(400).send('Key and ID are required');
+        }
+
+        const manager = new SecretManager(request.user.directories);
+        manager.rotateSecret(key, id);
+
+        return response.sendStatus(204);
+    } catch (error) {
+        console.error('Error rotating secret:', error);
+        return response.sendStatus(500);
+    }
+});
+
+router.post('/rename', (request, response) => {
+    try {
+        const { key, id, label } = request.body;
+
+        if (!key || !id || !label) {
+            return response.status(400).send('Key, ID, and label are required');
+        }
+
+        const manager = new SecretManager(request.user.directories);
+        manager.renameSecret(key, id, label);
+
+        return response.sendStatus(204);
+    } catch (error) {
+        console.error('Error renaming secret:', error);
+        return response.sendStatus(500);
+    }
+});
+
+router.post('/settings', async (_request, response) => {
+    return response.send({ allowKeysExposure });
+});
