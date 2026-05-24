@@ -30,6 +30,7 @@ const coreFiles = [
     'src/server-main.js',
     'src/endpoints/secrets.js',
     'src/endpoints/avatars.js',
+    'public/scripts/user.js',
     'public/scripts/secrets.js',
     'public/scripts/personas.js',
 ];
