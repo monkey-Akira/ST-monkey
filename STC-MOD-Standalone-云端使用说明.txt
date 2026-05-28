@@ -1,0 +1,487 @@
+STC-MOD-Standalone 云端安装、PM2 启动、更新、回滚说明
+========================================================
+
+一、这个工具是什么
+------------------
+
+STC-MOD-Standalone 是一个云端安装工具，不是单独运行的酒馆。
+
+它的作用是：
+
+1. 自动 git clone 官方 SillyTavern。
+2. 自动复制 STC-MOD 后端模块。
+3. 自动复制 STC Admin Panel 前端扩展。
+4. 自动应用必要补丁。
+5. 自动安装依赖。
+6. 使用 releases/current/shared 结构，方便以后更新和回滚。
+
+默认安装后的目录结构是：
+
+~/stc-app/
+  current -> releases/某个版本
+  releases/
+    20260523-xxxxxx/
+    20260524-xxxxxx/
+  shared/
+    config/config.yaml
+    data/
+    plugins/
+    extensions/
+  start.sh
+
+重要路径：
+
+当前运行的酒馆代码：
+~/stc-app/current
+
+配置文件：
+~/stc-app/shared/config/config.yaml
+
+用户数据：
+~/stc-app/shared/data
+
+MOD 后端代码：
+~/stc-app/current/src/stc-mod
+
+STC 管理面板扩展：
+~/stc-app/current/public/scripts/extensions/third-party/stc-admin-panel
+
+
+二、服务器环境准备
+------------------
+
+以下命令适用于 Ubuntu / Debian：
+
+sudo apt update
+sudo apt install -y git curl
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+
+检查版本：
+
+node -v
+npm -v
+git --version
+
+建议 Node.js 使用 20.x 或 22.x。
+
+
+三、上传或 clone 工具
+--------------------
+
+如果你已经把 STC-MOD-Standalone 上传到 Git 仓库：
+
+git clone 你的仓库地址 STC-MOD-Standalone
+cd STC-MOD-Standalone
+
+如果你是手动上传压缩包：
+
+unzip STC-MOD-Standalone.zip
+cd STC-MOD-Standalone
+
+
+四、首次安装
+------------
+
+默认安装到 ~/stc-app：
+
+bash install.sh
+
+安装到自定义目录，例如 /opt/stc：
+
+sudo mkdir -p /opt/stc
+sudo chown -R $USER:$USER /opt/stc
+bash install.sh /opt/stc
+
+指定端口安装，例如 9000：
+
+PORT=9000 bash install.sh
+
+安装完成后，默认会生成：
+
+~/stc-app/current
+~/stc-app/shared
+~/stc-app/start.sh
+
+
+五、普通方式启动
+----------------
+
+默认路径：
+
+cd ~/stc-app
+./start.sh
+
+访问：
+
+http://服务器IP:8000/
+
+如果安装时用了 /opt/stc：
+
+cd /opt/stc
+./start.sh
+
+
+六、推荐：使用 PM2 管理
+----------------------
+
+安装 PM2：
+
+npm install -g pm2
+
+方式 A：启动 start.sh
+
+cd ~/stc-app
+pm2 start ./start.sh --name st
+pm2 save
+
+方式 B：像官方酒馆一样直接启动 server.js
+
+cd ~/stc-app/current
+pm2 start server.js --name st -- --listen --port 8000
+pm2 save
+
+推荐方式 B，更接近官方用法。
+
+注意：
+官方 SillyTavern 当前参数建议用：
+
+--listen --port 8000
+
+不要使用：
+
+--host 0.0.0.0
+
+因为这个版本主要识别的是 listen / listenAddressIPv4。
+
+PM2 常用命令：
+
+查看进程：
+pm2 status
+
+查看日志：
+pm2 logs st
+
+重启：
+pm2 restart st
+
+停止：
+pm2 stop st
+
+删除：
+pm2 delete st
+
+保存进程列表：
+pm2 save
+
+设置开机自启：
+pm2 startup
+
+执行 pm2 startup 后，它会输出一条 sudo env PATH=... 的命令。
+复制那条命令执行，然后再执行：
+
+pm2 save
+
+
+七、登录说明
+------------
+
+可能会遇到两层登录：
+
+1. Basic Auth
+   浏览器弹出的用户名密码框。
+
+默认：
+用户名：admin
+密码：123456
+
+2. SillyTavern 内部用户登录
+
+默认管理员用户：
+default-user
+
+如果 default-user 没有设置内部密码，测试时可以密码留空登录。
+
+Basic Auth 配置位置：
+
+nano ~/stc-app/shared/config/config.yaml
+
+相关配置：
+
+basicAuthMode: true
+
+basicAuthUser:
+  username: "admin"
+  password: "123456"
+
+如果要关闭 Basic Auth：
+
+basicAuthMode: false
+
+但注意：
+如果同时关闭 Basic Auth 和白名单，并且 default-user 没密码，SillyTavern 会因为安全策略退出。
+
+测试时如果必须关闭 Basic Auth 和白名单，需要加：
+
+securityOverride: true
+basicAuthMode: false
+whitelistMode: false
+
+正式公网环境不建议这样做。
+
+
+八、配置文件在哪里
+------------------
+
+默认安装时配置文件在：
+
+~/stc-app/shared/config/config.yaml
+
+当前 release 里的 config.yaml 是软链接：
+
+~/stc-app/current/config.yaml -> ~/stc-app/shared/config/config.yaml
+
+确认当前酒馆读的是哪个配置：
+
+readlink -f ~/stc-app/current/config.yaml
+
+编辑配置：
+
+nano ~/stc-app/shared/config/config.yaml
+
+修改配置后需要重启：
+
+pm2 restart st
+
+或者如果不用 PM2：
+
+cd ~/stc-app
+./start.sh
+
+
+九、更新说明
+------------
+
+不要进入 ~/stc-app/current 手动 git pull。
+
+正确方式是通过 MOD 工具更新：
+
+cd ~/STC-MOD-Standalone
+git pull
+bash update.sh ~/stc-app
+pm2 restart st
+
+如果安装在 /opt/stc：
+
+cd ~/STC-MOD-Standalone
+git pull
+bash update.sh /opt/stc
+pm2 restart st
+
+update.sh 会做这些事：
+
+1. 创建新的 release 目录。
+2. 拉取最新官方 SillyTavern。
+3. 重新应用 STC-MOD。
+4. 安装 npm 依赖。
+5. 检查关键 JS 语法。
+6. 成功后才切换 current。
+7. 失败则保持旧 current 不变。
+
+查看当前状态：
+
+cd ~/STC-MOD-Standalone
+bash status.sh ~/stc-app
+
+
+十、回滚说明
+------------
+
+如果更新后不能用，回滚：
+
+cd ~/STC-MOD-Standalone
+bash rollback.sh ~/stc-app
+pm2 restart st
+
+回滚到指定 release：
+
+bash rollback.sh ~/stc-app 20260523-153000
+pm2 restart st
+
+查看可用 release：
+
+ls -1 ~/stc-app/releases
+
+回滚只切换 current 指向，不会覆盖 shared/data。
+
+也就是说，用户数据、配置、插件不会因为回滚被删除。
+
+
+十一、官方方式启动时 MOD 是否生效
+----------------------------------
+
+会生效，前提是你启动的是：
+
+~/stc-app/current/server.js
+
+例如：
+
+cd ~/stc-app/current
+pm2 start server.js --name st -- --listen --port 8000
+
+MOD 已经安装到 current release 里面：
+
+~/stc-app/current/src/stc-mod
+~/stc-app/current/public/scripts/extensions/third-party/stc-admin-panel
+~/stc-app/current/src/server-main.js
+
+启动日志里应看到：
+
+[STC-MOD] SillyTavernchat module loaded.
+[STC-MOD] Public routes registered.
+[STC-MOD] Private API routes registered.
+
+如果你启动的是别的官方原始酒馆目录，例如 ~/SillyTavern/server.js，
+那 MOD 不会生效。
+
+
+十二、账户备份按钮修改说明
+--------------------------
+
+当前工具只隐藏普通用户在“我的账户”里看到的官方账户备份按钮。
+
+相关补丁文件：
+
+STC-MOD-Standalone/patches/core-files/public/scripts/user.js
+
+行为：
+
+1. 普通用户打开“我的账户”，不显示下载备份按钮。
+2. Admin 打开“我的账户”，显示下载备份按钮。
+3. Admin 在用户管理面板里给其他用户备份的功能不受影响。
+4. 后端 /api/users/backup 没有限制成 Admin-only，避免影响其他用户数据备份机制。
+
+更新后同步方式：
+
+cd ~/STC-MOD-Standalone
+git pull
+bash update.sh ~/stc-app
+pm2 restart st
+
+
+十三、常见问题
+--------------
+
+问题 1：启动后直接回到命令行
+
+查看日志：
+
+cd ~/stc-app/current
+node server.js --listen --port 8000
+
+如果看到：
+
+If you are not using basic authentication or whitelisting, you should set a password for all admin users.
+
+说明你关闭了 Basic Auth 和白名单，但 default-user 没密码。
+
+解决：
+
+方案 A：开启 Basic Auth
+
+basicAuthMode: true
+
+方案 B：设置 default-user 密码
+
+方案 C：测试时临时加 securityOverride
+
+securityOverride: true
+
+
+问题 2：admin / 123456 登录不进去
+
+admin / 123456 只用于浏览器弹出的 Basic Auth 窗口。
+
+如果是酒馆网页里的登录页，应使用：
+
+default-user
+
+密码留空，或者使用你后续设置的用户密码。
+
+检查 Basic Auth 配置：
+
+grep -nE "basicAuthMode|basicAuthUser|username|password" ~/stc-app/shared/config/config.yaml
+
+
+问题 3：端口访问不了
+
+检查进程：
+
+pm2 status
+
+检查监听：
+
+ss -lntp | grep 8000
+
+检查防火墙：
+
+sudo ufw status
+
+放行端口：
+
+sudo ufw allow 8000/tcp
+
+如果是云厂商服务器，还要在云控制台安全组放行 8000。
+
+
+问题 4：更新后 PM2 还是跑旧版本
+
+执行：
+
+pm2 delete st
+cd ~/stc-app/current
+pm2 start server.js --name st -- --listen --port 8000
+pm2 save
+
+
+问题 5：想看当前版本
+
+cd ~/STC-MOD-Standalone
+bash status.sh ~/stc-app
+
+
+十四、推荐日常命令
+------------------
+
+启动：
+
+cd ~/stc-app/current
+pm2 start server.js --name st -- --listen --port 8000
+pm2 save
+
+重启：
+
+pm2 restart st
+
+查看日志：
+
+pm2 logs st
+
+更新：
+
+cd ~/STC-MOD-Standalone
+git pull
+bash update.sh ~/stc-app
+pm2 restart st
+
+回滚：
+
+cd ~/STC-MOD-Standalone
+bash rollback.sh ~/stc-app
+pm2 restart st
+
+查看状态：
+
+cd ~/STC-MOD-Standalone
+bash status.sh ~/stc-app
+

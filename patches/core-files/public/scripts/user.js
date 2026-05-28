@@ -71,6 +71,143 @@ async function getCurrentUser() {
 
         currentUser = await response.json();
         $('#admin_button').toggle(accountsEnabled && isAdmin());
+        // 如果不是管理员，隐藏导出按钮和介绍区域
+        if (isAdmin()) {
+            $('#export_button').show(); // 正常显示导出按钮
+            $('#completion_prompt_manager_popup_inspect').hide();
+        }else {
+            $('#export_button')
+            .css('pointer-events', 'none')
+            .css('opacity', '0.3')
+            .attr('title', '只有管理员可以导出角色');
+            $('#extensionsMenuButton')
+            .css('pointer-events', 'none')
+            .css('opacity', '0.3')
+            .attr('title', '猴子不给看');
+            
+            // 【新增】隐藏更多...下拉菜单及其标签
+            //扩展菜单不可点击
+            $('#extensionsMenuButton').hide();
+            
+            $('label[for="char-management-dropdown"]').hide();
+            $('#char-management-dropdown').hide();
+            $('#completion_prompt_manager_popup_inspect').hide();
+            //隐藏inspect
+            const selector = '#completion_prompt_manager_popup_entry_form_inspect_list';
+            // 2. 创建 CSS 隐藏规则，使用 !important 确保最高优先级
+            const cssRule = `
+                ${selector} {
+                    display: none !important;
+                }
+            `;
+            // 3. 创建 <style> 标签并注入到网页 <head>
+            const styleElement = document.createElement('style');
+            // 给一个唯一的ID，防止重复注入
+            styleElement.id = 'hide-inspect-list-rule';
+            styleElement.textContent = cssRule;
+        
+            if (!document.getElementById(styleElement.id)) {
+                document.head.appendChild(styleElement);
+            }
+            //隐藏inspect结束
+        }
+        //如果不是管理员隐藏世界书和人设
+        if (isAdmin()) {
+            // 隐藏显示原始提示词、复制提示词和显示提示词差异按钮
+            const hideDynamicElements = () => {
+                // 根据您截图提供的id，直接隐藏这个按钮
+                $('#showRawPrompt').hide();
+                // 同时隐藏它旁边的复制和差异按钮
+                $('#copyPromptToClipboard').hide();
+                $('#diffPrevPrompt').hide();
+
+            };
+
+            // 页面加载后先立即执行一次，尝试隐藏可能已经存在的动态元素
+            hideDynamicElements();
+
+            // 4. 创建一个 MutationObserver 来持续监控页面的所有变动
+            // 这是处理动态加载内容（例如点击发送后才出现的按钮）最可靠的方法
+            const observer = new MutationObserver(hideDynamicElements);
+            
+            // 配置观察器以监控整个文档的子元素添加和删除
+            observer.observe(document.body, {
+                childList: true, // 监控子节点的变动（添加或删除）
+                subtree: true,   // 监控所有后代节点
+            });
+        }else {
+           //隐藏世界书条目详情按钮
+            $('.inline-drawer-toggle.fa-circle-chevron-down').hide();
+            // 禁用世界书导出按钮
+            $('#world_popup_export')
+                .css('pointer-events', 'none')
+                .css('opacity', '0.3')
+                .attr('title', '只有管理员可以导出世界书');
+            // 禁用详情查看按钮
+            $('#spoiler_free_desc_button')
+                .css('pointer-events', 'none')
+                .css('opacity', '0.3')
+                .attr('title', '只有管理员可以查看');
+            //隐藏世界书全部展开
+            $('#OpenAllWIEntries').hide();
+            //隐藏人设
+            $('#description_textarea').hide();
+            // 隐藏最大化编辑器按钮
+            $('i.editor_maximize[data-for="description_textarea"]').hide();
+            
+            // 隐藏显示原始提示词、复制提示词和显示提示词差异按钮
+            const hideDynamicElements = () => {
+                // 根据您截图提供的id，直接隐藏这个按钮
+                $('#showRawPrompt').hide();
+                // 同时隐藏它旁边的复制和差异按钮
+                $('#copyPromptToClipboard').hide();
+                $('#diffPrevPrompt').hide();
+
+            };
+
+            // 页面加载后先立即执行一次，尝试隐藏可能已经存在的动态元素
+            hideDynamicElements();
+
+            // 4. 创建一个 MutationObserver 来持续监控页面的所有变动
+            // 这是处理动态加载内容（例如点击发送后才出现的按钮）最可靠的方法
+            const observer = new MutationObserver(hideDynamicElements);
+            
+            // 配置观察器以监控整个文档的子元素添加和删除
+            observer.observe(document.body, {
+                childList: true, // 监控子节点的变动（添加或删除）
+                subtree: true,   // 监控所有后代节点
+            });
+        }
+
+        //如果不是管理员隐藏预设按钮
+        if (isAdmin()) {
+            
+        }else {
+            const hideEditSpans = () => {
+                const spans = document.querySelectorAll('span.prompt-manager-edit-action');
+                spans.forEach(span => {
+                    // 使用 style.visibility 替代 display 可选：透明不可见但保留布局
+                    span.style.display = 'none'; 
+                });
+            }
+            // 执行一次
+            hideEditSpans();
+
+            // 再执行几次以防按钮动态生成
+            let counter = 0;
+            const interval = setInterval(() => {
+                hideEditSpans();
+                counter++;
+                if (counter > 10) clearInterval(interval); // 最多执行 10 次，每秒一次
+            }, 1000);
+
+            // 防止一些特殊异步加载场景
+            const observer = new MutationObserver(hideEditSpans);
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+            });
+        }
     } catch (error) {
         console.error('Error getting current user:', error);
     }

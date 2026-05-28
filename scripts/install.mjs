@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const modRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const target = path.resolve(process.argv[2] || '');
+const monkeyApiUrl = 'https://monkeyapi.apimonkey.online/v1';
 
 if (!target) {
     fail('Usage: node scripts/install.mjs /path/to/SillyTavern');
@@ -59,6 +60,8 @@ if (!fs.existsSync(targetConfig)) {
     mergeConfigText(targetConfig);
 }
 
+configureDefaultChatCompletion();
+
 ensurePackageDependency('nodemailer', '^8.0.1');
 ensurePackageDependency('yaml', '^2.8.3');
 
@@ -74,6 +77,43 @@ function ensurePackageDependency(name, version) {
         fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 4)}\n`, 'utf8');
         log(`Added package dependency: ${name}@${version}`);
     }
+}
+
+function configureDefaultChatCompletion() {
+    const settingsPath = path.join(target, 'default', 'content', 'settings.json');
+    updateJsonFile(settingsPath, 'default/content/settings.json', (settings) => {
+        settings.main_api = 'openai';
+        settings.openai_settings ??= {};
+        settings.openai_settings.chat_completion_source = 'custom';
+        settings.openai_settings.custom_url = monkeyApiUrl;
+    });
+
+    const openAiDefaultPresetPath = path.join(target, 'default', 'content', 'presets', 'openai', 'Default.json');
+    updateJsonFile(openAiDefaultPresetPath, 'default/content/presets/openai/Default.json', (preset) => {
+        preset.chat_completion_source = 'custom';
+        preset.custom_url = monkeyApiUrl;
+    });
+}
+
+function updateJsonFile(filePath, rel, mutate) {
+    if (!fs.existsSync(filePath)) {
+        log(`Skipped missing ${rel}`);
+        return;
+    }
+
+    const json = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const before = JSON.stringify(json);
+    mutate(json);
+    const after = JSON.stringify(json);
+
+    if (before === after) {
+        log(`${rel} already has STC-MOD chat completion defaults`);
+        return;
+    }
+
+    backupFile(filePath, rel);
+    fs.writeFileSync(filePath, `${JSON.stringify(json, null, 4)}\n`, 'utf8');
+    log(`Configured ${rel} to use Monkey API chat completion defaults`);
 }
 
 function mergeConfigText(configPath) {

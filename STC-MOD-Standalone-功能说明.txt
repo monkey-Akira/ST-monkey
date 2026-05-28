@@ -1,0 +1,825 @@
+STC-MOD-Standalone 功能说明
+===========================
+
+本文档只说明 STC-MOD-Standalone 这个 MOD 工具包含哪些功能。
+安装、更新、PM2、回滚等操作指令请看桌面上的：
+STC-MOD-Standalone-云端使用说明.txt
+
+
+一、这个项目是什么
+------------------
+
+STC-MOD-Standalone 不是一个单独运行的新酒馆。
+
+它是一个给官方 SillyTavern 使用的 MOD 安装与更新工具。
+
+它的作用是：
+
+1. 自动下载官方 SillyTavern。
+2. 把 STC-MOD 后端功能接入 SillyTavern。
+3. 把 STC Admin Panel 前端扩展接入 SillyTavern。
+4. 自动应用必要的核心补丁。
+5. 保留官方 SillyTavern 的更新能力。
+6. 支持更新失败后回滚到上一版本。
+
+简单说：
+
+官方 SillyTavern 负责原本的聊天、角色卡、模型接口等功能。
+STC-MOD 负责增加用户管理、注册、邀请码、公告、论坛、公共角色库、API 密钥保险箱、存储限制、系统监控等功能。
+
+
+二、整体功能分类
+----------------
+
+STC-MOD 主要分成以下几类功能：
+
+1. 云端一键安装与更新工具
+2. STC 后端模块
+3. STC Admin Panel 前端管理面板
+4. 自定义登录、注册、欢迎页
+5. 用户注册与邀请码系统
+6. 用户扩展管理
+7. 邮件服务
+8. OAuth 第三方登录
+9. 公告系统
+10. 社区论坛
+11. 公共角色卡库
+12. 用户存储空间限制
+13. API 密钥保险箱
+14. 默认用户模板
+15. 系统监控
+16. 定时任务
+17. 官方账户备份按钮隐藏补丁
+18. 静态资源缓存优化
+
+
+三、云端一键安装与更新工具
+--------------------------
+
+这是 STC-MOD-Standalone 最外层的工具能力。
+
+包含文件：
+
+install.sh
+update.sh
+rollback.sh
+status.sh
+scripts/install.mjs
+scripts/release-common.sh
+
+主要功能：
+
+1. 自动 git clone 官方 SillyTavern。
+2. 自动把 MOD 文件复制到新下载的 SillyTavern 里面。
+3. 自动安装依赖。
+4. 自动生成 releases/current/shared 结构。
+5. 支持以后更新官方 SillyTavern。
+6. 支持更新后重新应用 MOD。
+7. 支持更新失败不切换版本。
+8. 支持回滚到上一版本。
+
+安装后的典型目录：
+
+~/stc-app/
+  current -> releases/某个版本
+  releases/
+  shared/
+    config/config.yaml
+    data/
+    plugins/
+    extensions/
+  start.sh
+
+这个结构的意义：
+
+current 是当前正在运行的 SillyTavern。
+releases 里面保存每次安装或更新出来的版本。
+shared 保存配置和用户数据。
+
+更新 SillyTavern 时，新的官方代码会放进新的 release 目录。
+用户数据不会被覆盖。
+如果新版本出问题，可以 rollback 回旧 release。
+
+
+四、STC 后端模块
+----------------
+
+后端模块目录：
+
+src/stc-mod/
+
+它是整个 MOD 的核心。
+
+它通过 SillyTavern 的 server-main.js 注入几个钩子：
+
+1. 加载 STC-MOD 模块。
+2. 给 STC-MOD 自定义接口提供 CSRF 豁免。
+3. 注册公开页面路由。
+4. 注册公开 API。
+5. 注册需要登录的私有 API。
+
+主要入口文件：
+
+src/stc-mod/index.js
+
+主要导出能力：
+
+shouldSkipCsrf(req)
+setupPublicRoutes(app)
+setupPublicApi(app)
+setupPrivateRoutes(app)
+
+意思是：
+
+STC-MOD 后端不是完全重写 SillyTavern。
+它是挂在 SillyTavern 服务器上的外挂模块。
+
+
+五、STC Admin Panel 前端管理面板
+-------------------------------
+
+前端扩展目录：
+
+public/scripts/extensions/third-party/stc-admin-panel/
+
+这是一个 SillyTavern 第三方扩展。
+
+它主要提供一个图形化管理面板，让管理员或用户可以在网页里操作 STC-MOD 的功能。
+
+常见功能入口包括：
+
+1. 用户管理
+2. 邀请码管理
+3. 公告管理
+4. 邮件配置
+5. OAuth 配置
+6. 存储空间管理
+7. 系统监控
+8. API 密钥保险箱
+9. 默认用户模板
+10. 公共角色卡库
+11. 论坛相关管理
+
+注意：
+
+这个前端扩展单独复制到官方 SillyTavern 里没有意义。
+它需要后端的 /api/stc/* 接口一起存在，才能正常工作。
+
+
+六、自定义欢迎页、登录页、注册页
+--------------------------------
+
+相关文件：
+
+src/stc-mod/public/welcome.html
+src/stc-mod/public/login.html
+src/stc-mod/public/register.html
+
+主要功能：
+
+1. 提供自定义欢迎页。
+2. 提供自定义登录页。
+3. 提供自定义注册页。
+4. 登录页可以显示公告。
+5. 登录页可以显示 OAuth 第三方登录按钮。
+6. 注册页可以配合邀请码系统使用。
+
+重要说明：
+
+这些页面通过 server-main.js 的公开路由钩子接入。
+路由必须注册在官方 / 和 /login 路由之前。
+否则官方登录跳转会覆盖 STC-MOD 的欢迎页和登录页。
+
+
+七、用户注册与邀请码系统
+------------------------
+
+相关文件：
+
+src/stc-mod/routes/public/register.js
+src/stc-mod/routes/public/register-helper.js
+src/stc-mod/routes/public/invitation-status.js
+src/stc-mod/routes/private/invitation-codes.js
+src/stc-mod/services/invitation-codes.js
+
+主要功能：
+
+1. 允许用户通过注册页创建账号。
+2. 支持开启或关闭邀请码注册。
+3. 管理员可以创建邀请码。
+4. 管理员可以查看邀请码使用情况。
+5. 可以用邀请码控制谁能注册。
+6. 可以限制邀请码有效期或使用次数，具体取决于面板实现。
+
+配置项：
+
+enableInvitationCodes
+
+如果开启，注册时需要邀请码。
+如果关闭，可以不使用邀请码系统。
+
+
+八、用户扩展管理
+----------------
+
+相关文件：
+
+src/stc-mod/user-metadata.js
+src/stc-mod/routes/private/user-extend.js
+
+主要功能：
+
+1. 给官方用户增加额外信息。
+2. 管理用户邮箱。
+3. 管理用户 OAuth 绑定信息。
+4. 管理用户过期时间。
+5. 管理用户存储额度。
+6. 管理用户签到或续费相关字段。
+7. 给管理员提供额外用户管理能力。
+
+这些扩展信息不会直接塞进官方用户核心结构里。
+它们主要存放在：
+
+data/stc-mod/user-metadata.json
+
+这样做的好处：
+
+1. 降低对官方 SillyTavern 用户系统的侵入。
+2. 官方更新时更容易维护。
+3. MOD 自己的数据和官方数据分开。
+
+
+九、邮件服务
+------------
+
+相关文件：
+
+src/stc-mod/services/email-service.js
+src/stc-mod/routes/private/email-config.js
+src/stc-mod/routes/public/email-status.js
+
+主要功能：
+
+1. 配置邮件服务。
+2. 检查邮件服务状态。
+3. 给注册、找回、通知等功能提供邮件能力。
+4. 如果没有配置邮件，相关邮件功能可以不启用。
+
+新增依赖：
+
+nodemailer
+
+用途：
+
+发送邮件。
+
+注意：
+
+邮件功能通常需要你自己准备 SMTP 服务。
+比如 QQ 邮箱、企业邮箱、Gmail、Outlook 或服务器邮件服务。
+
+
+十、OAuth 第三方登录
+-------------------
+
+相关文件：
+
+src/stc-mod/routes/public/oauth.js
+src/stc-mod/routes/private/oauth-config.js
+
+主要功能：
+
+1. 支持 OAuth 第三方登录。
+2. 管理员可以配置 OAuth 参数。
+3. 登录页可以显示第三方登录按钮。
+4. OAuth 登录后可以绑定或识别用户。
+
+常见用途：
+
+1. 用第三方平台账号登录。
+2. 减少用户手动注册账号的步骤。
+3. 给云端酒馆提供更像网站的登录体验。
+
+注意：
+
+OAuth 需要第三方平台提供 Client ID、Client Secret、回调地址等参数。
+具体能不能用，取决于你配置的 OAuth 服务。
+
+
+十一、公告系统
+--------------
+
+相关文件：
+
+src/stc-mod/routes/private/announcements.js
+src/stc-mod/routes/public/announcements-public.js
+
+主要功能：
+
+1. 管理员可以发布公告。
+2. 登录页或公开页面可以显示公告。
+3. 用于通知用户维护、更新、规则、付费说明等内容。
+
+数据位置：
+
+data/stc-mod/announcements/
+
+适合用途：
+
+1. 通知维护时间。
+2. 通知版本更新。
+3. 通知使用规则。
+4. 通知购买链接或续费说明。
+
+
+十二、社区论坛
+--------------
+
+相关文件：
+
+src/stc-mod/public/forum.html
+src/stc-mod/routes/private/forum.js
+
+主要功能：
+
+1. 提供一个论坛页面。
+2. 用户可以查看或发布论坛内容，具体权限取决于后台实现。
+3. 支持论坛数据和图片存储。
+
+配置项：
+
+enableForum
+
+数据位置：
+
+data/stc-mod/forum_data/
+
+适合用途：
+
+1. 用户交流。
+2. 发布教程。
+3. 反馈问题。
+4. 分享角色或提示词相关内容。
+
+
+十三、公共角色卡库
+------------------
+
+相关文件：
+
+src/stc-mod/public/public-characters.html
+src/stc-mod/routes/private/public-characters.js
+
+主要功能：
+
+1. 提供公共角色卡页面。
+2. 管理或展示公共角色卡。
+3. 用户可以访问公共角色资源，具体上传和管理权限取决于面板设置。
+
+配置项：
+
+enablePublicCharacters
+
+数据位置：
+
+data/stc-mod/public_characters/
+
+适合用途：
+
+1. 建一个公共角色卡市场。
+2. 给所有用户提供默认角色。
+3. 让管理员统一发布角色卡。
+
+
+十四、用户存储空间限制
+----------------------
+
+相关文件：
+
+src/stc-mod/services/storage-quota.js
+src/stc-mod/middleware/storage-enforce.js
+src/stc-mod/routes/private/user-storage.js
+
+主要功能：
+
+1. 给用户设置存储空间额度。
+2. 检查用户数据占用。
+3. 限制用户超过额度后继续上传或写入部分数据。
+4. 管理员可以管理用户存储。
+5. 支持存储激活码相关数据。
+
+数据位置：
+
+data/stc-mod/storage-codes.json
+
+启动日志里出现：
+
+[STC-MOD] Storage quota enforcement middleware registered.
+
+说明存储限制中间件已经注册。
+
+适合用途：
+
+1. 云端多人酒馆。
+2. 防止普通用户无限上传文件。
+3. 给不同用户分配不同容量。
+
+
+十五、API 密钥保险箱
+-------------------
+
+相关文件：
+
+src/stc-mod/services/privacy-vault.js
+src/stc-mod/routes/private/privacy-vault.js
+patches/core-files/src/endpoints/secrets.js
+patches/core-files/public/scripts/secrets.js
+
+主要功能：
+
+1. 保护用户填写在 SillyTavern 里的 API Key。
+2. 启用后，把 secrets.json 里的 API Key value 加密保存。
+3. 使用 AES-256-GCM 加密。
+4. 解锁后，服务端只在内存中短期保存解密密钥。
+5. 锁定状态下，读取已加密 API Key 会失败并提示解锁。
+6. 支持第一次启用时迁移已有明文 API Key。
+7. 支持忘记密码后重置保险箱。
+
+用户界面能力：
+
+1. 未启用时提示启用保险箱。
+2. 已锁定时提示解锁。
+3. 已解锁时允许正常保存和使用 API Key。
+4. 忘记密码时可以重置保险箱。
+
+重要说明：
+
+保险箱密码不是账号登录密码。
+如果忘记保险箱密码，已加密的 API Key 无法恢复。
+重置保险箱会清理已加密的 API Key，需要重新填写。
+
+
+十六、默认用户模板
+------------------
+
+相关文件：
+
+src/stc-mod/services/default-template.js
+src/stc-mod/routes/private/default-config.js
+
+主要功能：
+
+1. 管理新用户默认配置模板。
+2. 新注册用户可以自动获得一份默认配置。
+3. 可以统一初始化用户的部分设置或资源。
+
+数据位置：
+
+data/stc-mod/default-template/
+
+适合用途：
+
+1. 给新用户统一默认角色。
+2. 给新用户统一默认设置。
+3. 给新用户统一预置资源。
+
+
+十七、系统监控
+--------------
+
+相关文件：
+
+src/stc-mod/services/system-monitor.js
+src/stc-mod/routes/private/system-load.js
+
+主要功能：
+
+1. 监控服务器系统状态。
+2. 给管理员查看服务器负载。
+3. 记录部分系统监控历史。
+
+数据位置：
+
+data/stc-mod/system-monitor-history.json
+
+启动日志里出现：
+
+[STC-MOD] System monitoring started
+
+说明系统监控已经启动。
+
+适合用途：
+
+1. 查看云服务器压力。
+2. 判断用户太多时是否需要升级配置。
+3. 排查卡顿是否和服务器负载有关。
+
+
+十八、定时任务
+--------------
+
+相关文件：
+
+src/stc-mod/routes/private/scheduled-tasks.js
+
+主要功能：
+
+1. 处理需要定期执行的后台任务。
+2. 可以配合用户过期、存储检查、清理等功能。
+3. 具体执行内容取决于当前 MOD 代码实现。
+
+适合用途：
+
+1. 检查过期用户。
+2. 处理周期性清理。
+3. 执行后台维护任务。
+
+
+十九、官方账户备份按钮隐藏补丁
+------------------------------
+
+相关文件：
+
+patches/core-files/public/scripts/user.js
+
+这个补丁只做一件事：
+
+普通用户打开官方账户资料页面时，隐藏官方的“下载备份”按钮。
+
+当前设计：
+
+1. Admin 管理员仍然能看到并使用下载备份按钮。
+2. 普通用户只是在前端看不到按钮。
+3. 后端备份接口没有被禁用。
+4. 其他用户仍然可以正常使用账号和数据。
+5. 这不是安全权限限制，只是隐藏按钮。
+
+为什么这样做：
+
+你的需求是“其他用户也要备份，只是不让他们下载，只要隐藏按钮”。
+所以这里只改前端显示，不额外加后端限制。
+
+
+二十、静态资源缓存优化
+----------------------
+
+相关文件：
+
+patches/core-files/src/server-main.js
+
+主要功能：
+
+1. 给 JS、CSS、字体、图片等静态文件增加缓存。
+2. 减少重复下载。
+3. 改善云服务器或国内网络环境下的加载速度。
+
+缓存策略：
+
+JS、CSS、字体、图片等静态资源缓存 1 天。
+HTML 页面缓存 1 小时并保留协商缓存。
+
+作用：
+
+登录后 SillyTavern 主界面会加载很多 JS、CSS 和图片资源。
+缓存后，第二次打开会更快。
+
+
+二十一、数据存储位置
+--------------------
+
+STC-MOD 自己的数据主要保存在：
+
+data/stc-mod/
+
+常见数据文件和目录：
+
+user-metadata.json
+invitation-codes.json
+storage-codes.json
+announcements/
+forum_data/
+public_characters/
+default-template/
+privacy-vaults/
+system-monitor-history.json
+
+在云端安装结构里，真实位置通常是：
+
+~/stc-app/shared/data/stc-mod/
+
+这样更新官方 SillyTavern 或回滚版本时，用户数据和 MOD 数据不会跟着丢失。
+
+
+二十二、配置项
+--------------
+
+STC-MOD 会在 config.yaml 里增加或使用一些配置项。
+
+常见配置项：
+
+enableInvitationCodes
+enableForum
+enablePublicCharacters
+purchaseLink
+oauth
+
+配置文件位置：
+
+~/stc-app/shared/config/config.yaml
+
+current 目录中通常会链接到这个共享配置。
+
+不要只改 release 里面临时生成的配置。
+云端长期使用时，应以 shared/config/config.yaml 为准。
+
+
+二十三、新增依赖
+----------------
+
+STC-MOD 额外需要或会补充的依赖：
+
+nodemailer
+yaml
+
+nodemailer：
+
+用于邮件功能。
+
+yaml：
+
+用于读取和写入 config.yaml。
+
+如果官方 SillyTavern 已经包含相关依赖，就不需要重复安装。
+安装脚本会尽量自动处理。
+
+
+二十四、哪些功能需要管理员
+--------------------------
+
+通常需要 Admin 身份的功能：
+
+1. 邀请码管理
+2. 用户扩展管理
+3. 邮件配置
+4. OAuth 配置
+5. 公告管理
+6. 用户存储管理
+7. 默认用户模板管理
+8. 系统监控查看
+9. 部分论坛管理
+10. 部分公共角色库管理
+11. 官方账户备份按钮显示
+
+管理员登录后，可以通过 STC Admin Panel 使用这些功能。
+
+
+二十五、普通用户能用的功能
+--------------------------
+
+普通用户可能使用到的功能：
+
+1. 自定义登录页登录。
+2. 注册账号。
+3. 使用邀请码注册。
+4. OAuth 第三方登录。
+5. 查看公告。
+6. 使用论坛。
+7. 使用公共角色卡库。
+8. 使用 API 密钥保险箱。
+9. 查看自己的账户信息。
+
+普通用户默认不应该看到管理员管理入口。
+
+
+二十六、这个 MOD 对官方 SillyTavern 的影响
+------------------------------------------
+
+STC-MOD 尽量把新增功能放在 src/stc-mod/ 和前端扩展目录里。
+
+但是有些功能必须改官方核心文件，例如：
+
+1. server-main.js
+2. secrets.js
+3. avatars.js
+4. personas.js
+5. user.js
+
+这些核心文件补丁放在：
+
+patches/core-files/
+
+为什么要改核心文件：
+
+1. 自定义登录页、欢迎页需要接入官方服务器路由。
+2. API 密钥保险箱需要接管 secrets 的读写逻辑。
+3. 头像和 persona 相关功能需要适配 MOD 行为。
+4. 账户备份按钮隐藏需要改官方用户页面脚本。
+
+所以这个 MOD 不是完全零侵入。
+但它已经尽量把改动集中起来，方便以后维护。
+
+
+二十七、更新时功能如何保持
+--------------------------
+
+更新流程不是直接进入酒馆目录 git pull。
+
+正确方式是用 STC-MOD-Standalone 的 update.sh。
+
+update.sh 会：
+
+1. 下载或更新官方 SillyTavern。
+2. 创建新的 release 目录。
+3. 重新复制 STC-MOD 后端模块。
+4. 重新复制 STC Admin Panel 前端扩展。
+5. 重新应用 core-files 补丁。
+6. 安装依赖。
+7. 检查关键文件语法。
+8. 成功后才切换 current 到新版本。
+
+这样更新后，MOD 会重新生效。
+
+如果新版本不兼容，旧版本还保留在 releases 里。
+可以用 rollback.sh 回滚。
+
+
+二十八、回滚能力
+----------------
+
+rollback.sh 的作用：
+
+1. 把 current 切回上一个 release。
+2. 不删除 shared 用户数据。
+3. 不覆盖 config.yaml。
+4. 不破坏用户聊天数据。
+
+适合场景：
+
+1. 官方更新后 MOD 不兼容。
+2. 更新后网页打不开。
+3. 更新后登录异常。
+4. 更新后某些功能报错。
+
+回滚只是切换代码版本，不是恢复数据库快照。
+如果用户数据已经被新版程序写坏，仍然需要单独的数据备份。
+
+
+二十九、不包含什么
+------------------
+
+这个 MOD 不包含以下内容：
+
+1. 不包含模型 API 服务。
+2. 不包含 OpenAI、Claude、Gemini 等平台的 API Key。
+3. 不负责给服务器安装系统环境以外的软件服务。
+4. 不保证永远兼容所有未来官方 SillyTavern 版本。
+5. 不会自动解决官方大改核心文件造成的冲突。
+
+如果官方 SillyTavern 未来大改 server-main.js、secrets.js、user.js 等文件，
+MOD 补丁可能需要手动维护。
+
+
+三十、适合的使用场景
+--------------------
+
+这个 MOD 适合：
+
+1. 云端部署 SillyTavern。
+2. 多用户共用一个酒馆。
+3. 需要注册和邀请码。
+4. 需要管理员后台。
+5. 需要公告、论坛、公共角色卡库。
+6. 需要限制用户存储。
+7. 需要保护用户 API Key。
+8. 需要官方更新后 MOD 能重新应用。
+9. 需要更新失败可以回滚。
+
+不太适合：
+
+1. 只在本机单人使用酒馆。
+2. 不需要注册、不需要多用户、不需要后台。
+3. 希望完全不改官方任何文件。
+4. 希望直接把 MOD 当成独立网站运行。
+
+
+三十一、最简总结
+----------------
+
+STC-MOD-Standalone 做了两件事：
+
+第一，它给 SillyTavern 增加了一套云端多人运营功能。
+
+包括：
+
+注册、邀请码、公告、邮件、OAuth、论坛、公共角色库、用户扩展、存储限制、API 密钥保险箱、系统监控、默认模板、后台管理面板。
+
+第二，它把这些 MOD 功能做成了可安装、可更新、可回滚的云端工具。
+
+也就是：
+
+可以自动安装官方 SillyTavern。
+可以自动应用 MOD。
+可以以后更新官方 SillyTavern。
+可以更新失败后回滚。
+可以配合 PM2 长期运行。
+
