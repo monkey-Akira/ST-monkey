@@ -1584,17 +1584,14 @@ function tryInjectNavIntoWelcome(cfg) {
  */
 function injectSiteNavLinks(cfg) {
     // Try immediately (panel may already be present)
-    if (tryInjectNavIntoWelcome(cfg)) return;
+    tryInjectNavIntoWelcome(cfg);
 
-    // Watch #chat for the welcome prompt to appear
+    // Keep watching because the welcome prompt can be rebuilt after login/chat changes.
     const chat = document.getElementById('chat') || document.body;
     const obs = new MutationObserver(() => {
-        if (tryInjectNavIntoWelcome(cfg)) obs.disconnect();
+        tryInjectNavIntoWelcome(cfg);
     });
     obs.observe(chat, { childList: true, subtree: true });
-
-    // Safety timeout — disconnect after 60 s to avoid leaking observers
-    setTimeout(() => obs.disconnect(), 60000);
 }
 
 // ── Admin Panel Launcher ──────────────────────────────────────

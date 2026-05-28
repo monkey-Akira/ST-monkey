@@ -80,15 +80,7 @@ async function getCurrentUser() {
             .css('pointer-events', 'none')
             .css('opacity', '0.3')
             .attr('title', '只有管理员可以导出角色');
-            $('#extensionsMenuButton')
-            .css('pointer-events', 'none')
-            .css('opacity', '0.3')
-            .attr('title', '猴子不给看');
-            
             // 【新增】隐藏更多...下拉菜单及其标签
-            //扩展菜单不可点击
-            $('#extensionsMenuButton').hide();
-            
             $('label[for="char-management-dropdown"]').hide();
             $('#char-management-dropdown').hide();
             $('#completion_prompt_manager_popup_inspect').hide();
