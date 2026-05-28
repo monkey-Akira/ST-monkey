@@ -1586,12 +1586,25 @@ function injectSiteNavLinks(cfg) {
     // Try immediately (panel may already be present)
     tryInjectNavIntoWelcome(cfg);
 
-    // Keep watching because the welcome prompt can be rebuilt after login/chat changes.
-    const chat = document.getElementById('chat') || document.body;
-    const obs = new MutationObserver(() => {
-        tryInjectNavIntoWelcome(cfg);
-    });
-    obs.observe(chat, { childList: true, subtree: true });
+    // Keep watching the full document because SillyTavern can rebuild #chat itself.
+    if (injectSiteNavLinks.observer) {
+        injectSiteNavLinks.observer.disconnect();
+    }
+
+    let pending = false;
+    const scheduleInject = () => {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(() => {
+            pending = false;
+            tryInjectNavIntoWelcome(cfg);
+        });
+    };
+
+    const root = document.body || document.documentElement;
+    const obs = new MutationObserver(scheduleInject);
+    obs.observe(root, { childList: true, subtree: true });
+    injectSiteNavLinks.observer = obs;
 }
 
 // ── Admin Panel Launcher ──────────────────────────────────────

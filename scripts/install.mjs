@@ -83,9 +83,13 @@ function configureDefaultChatCompletion() {
     const settingsPath = path.join(target, 'default', 'content', 'settings.json');
     updateJsonFile(settingsPath, 'default/content/settings.json', (settings) => {
         settings.main_api = 'openai';
-        settings.openai_settings ??= {};
-        settings.openai_settings.chat_completion_source = 'custom';
-        settings.openai_settings.custom_url = monkeyApiUrl;
+        settings.oai_settings ??= settings.openai_settings ?? {};
+        settings.oai_settings.chat_completion_source = 'custom';
+        settings.oai_settings.custom_url = monkeyApiUrl;
+        if (settings.openai_settings) {
+            settings.openai_settings.chat_completion_source = 'custom';
+            settings.openai_settings.custom_url = monkeyApiUrl;
+        }
     });
 
     const openAiDefaultPresetPath = path.join(target, 'default', 'content', 'presets', 'openai', 'Default.json');
@@ -116,6 +120,40 @@ function updateJsonFile(filePath, rel, mutate) {
     log(`Configured ${rel} to use Monkey API chat completion defaults`);
 }
 
+function ensureNestedYamlBoolean(text, section, key, value) {
+    const newline = text.includes('\r\n') ? '\r\n' : '\n';
+    const lines = text.split(/\r?\n/);
+    const sectionPattern = new RegExp(`^${section}:\\s*(?:#.*)?$`);
+    const sectionIndex = lines.findIndex(line => sectionPattern.test(line));
+
+    if (sectionIndex === -1) {
+        return { text: `${text.replace(/\s*$/, '')}${newline}${newline}${section}:${newline}  ${key}: ${value}${newline}`, changed: true };
+    }
+
+    let sectionEnd = lines.length;
+    for (let i = sectionIndex + 1; i < lines.length; i++) {
+        if (lines[i].trim() && /^\S/.test(lines[i])) {
+            sectionEnd = i;
+            break;
+        }
+    }
+
+    const keyPattern = new RegExp(`^(\\s*)${key}:\\s*(true|false)(\\s*(?:#.*)?)?$`);
+    for (let i = sectionIndex + 1; i < sectionEnd; i++) {
+        const match = lines[i].match(keyPattern);
+        if (!match) continue;
+
+        const nextLine = `${match[1] || '  '}${key}: ${value}${match[3] || ''}`;
+        if (lines[i] === nextLine) return { text, changed: false };
+
+        lines[i] = nextLine;
+        return { text: lines.join(newline), changed: true };
+    }
+
+    lines.splice(sectionIndex + 1, 0, `  ${key}: ${value}`);
+    return { text: lines.join(newline), changed: true };
+}
+
 function mergeConfigText(configPath) {
     let text = fs.readFileSync(configPath, 'utf8');
     let changed = false;
@@ -133,6 +171,10 @@ function mergeConfigText(configPath) {
             changed = true;
         }
     }
+
+    const extensionsConfig = ensureNestedYamlBoolean(text, 'extensions', 'enabled', true);
+    text = extensionsConfig.text;
+    changed = extensionsConfig.changed || changed;
 
     if (!/^enableInvitationCodes:/m.test(text)) {
         text += `
@@ -176,6 +218,10 @@ userStorage:
   enabled: true
   defaultLimitMiB: 500
   dailyCheckInMiB: 0
+
+extensions:
+  enabled: true
+  autoUpdate: false
 
 privacy:
   secretsVault:

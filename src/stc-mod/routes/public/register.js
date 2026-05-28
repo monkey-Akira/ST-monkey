@@ -10,6 +10,7 @@ import * as invitationService from '../../services/invitation-codes.js';
 import { isEmailServiceAvailable, sendVerificationCode } from '../../services/email-service.js';
 import { applyTemplate, getTemplateMeta } from '../../services/default-template.js';
 import { getDefaultLimitMiB, isStorageLimitEnabled } from '../../services/storage-quota.js';
+import { applyMonkeyApiDefaults } from '../../services/chat-completion-defaults.js';
 
 export const router = express.Router();
 
@@ -135,6 +136,9 @@ router.post('/register', async (req, res) => {
             try { applyTemplate(handle); }
             catch (e) { console.error('[STC-MOD] Apply template failed:', e.message); }
         }
+
+        try { applyMonkeyApiDefaults(handle); }
+        catch (e) { console.error('[STC-MOD] Apply Monkey API defaults failed:', e.message); }
 
         res.json({
             success: true,

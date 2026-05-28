@@ -10,6 +10,7 @@ import { createUser } from './register-helper.js';
 import * as invitationService from '../../services/invitation-codes.js';
 import { getDefaultLimitMiB, isStorageLimitEnabled } from '../../services/storage-quota.js';
 import { applyTemplate, getTemplateMeta } from '../../services/default-template.js';
+import { applyMonkeyApiDefaults } from '../../services/chat-completion-defaults.js';
 
 export const router = express.Router();
 
@@ -138,6 +139,9 @@ router.get('/:provider/callback', async (req, res) => {
             try { applyTemplate(userHandle); } catch {}
         }
 
+        try { applyMonkeyApiDefaults(userHandle); }
+        catch (e) { console.error('[STC-MOD] Apply Monkey API defaults failed:', e.message); }
+
         if (req.session) {
             req.session.handle = userHandle;
         }
@@ -204,6 +208,9 @@ router.post('/complete-registration', async (req, res) => {
         if (getTemplateMeta()) {
             try { applyTemplate(userHandle); } catch {}
         }
+
+        try { applyMonkeyApiDefaults(userHandle); }
+        catch (e) { console.error('[STC-MOD] Apply Monkey API defaults failed:', e.message); }
 
         if (req.session) {
             req.session.handle = userHandle;
