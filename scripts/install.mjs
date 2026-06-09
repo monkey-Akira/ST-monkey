@@ -154,6 +154,36 @@ function ensureNestedYamlBoolean(text, section, key, value) {
     return { text: lines.join(newline), changed: true };
 }
 
+function removeDuplicateTopLevelYamlSections(text, section) {
+    const newline = text.includes('\r\n') ? '\r\n' : '\n';
+    const lines = text.split(/\r?\n/);
+    const sectionPattern = new RegExp(`^${section}:\\s*(?:#.*)?$`);
+    const ranges = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        if (!sectionPattern.test(lines[i])) continue;
+
+        let end = lines.length;
+        for (let j = i + 1; j < lines.length; j++) {
+            if (lines[j].trim() && /^\S/.test(lines[j])) {
+                end = j;
+                break;
+            }
+        }
+        ranges.push({ start: i, end });
+    }
+
+    if (ranges.length <= 1) {
+        return { text, changed: false, removed: 0 };
+    }
+
+    for (let i = ranges.length - 1; i > 0; i--) {
+        lines.splice(ranges[i].start, ranges[i].end - ranges[i].start);
+    }
+
+    return { text: lines.join(newline), changed: true, removed: ranges.length - 1 };
+}
+
 function mergeConfigText(configPath) {
     let text = fs.readFileSync(configPath, 'utf8');
     let changed = false;
@@ -173,9 +203,20 @@ function mergeConfigText(configPath) {
         }
     }
 
+    const dedupedExtensions = removeDuplicateTopLevelYamlSections(text, 'extensions');
+    text = dedupedExtensions.text;
+    changed = dedupedExtensions.changed || changed;
+    if (dedupedExtensions.removed > 0) {
+        log(`Removed ${dedupedExtensions.removed} duplicate extensions section(s) from config.yaml`);
+    }
+
     const extensionsConfig = ensureNestedYamlBoolean(text, 'extensions', 'enabled', true);
     text = extensionsConfig.text;
     changed = extensionsConfig.changed || changed;
+
+    const extensionsAutoUpdateConfig = ensureNestedYamlBoolean(text, 'extensions', 'autoUpdate', false);
+    text = extensionsAutoUpdateConfig.text;
+    changed = extensionsAutoUpdateConfig.changed || changed;
 
     if (!/^enableInvitationCodes:/m.test(text)) {
         text += `
