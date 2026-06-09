@@ -23,6 +23,7 @@ router.get('/me-ext', (req, res) => {
     const storage = getUserStorageInfo(handle);
     res.json({
         handle,
+        qq: meta.qq,
         email: meta.email,
         oauthProvider: meta.oauthProvider,
         expiresAt: meta.expiresAt,
@@ -167,7 +168,7 @@ router.get('/expiration-list', requireAdminMiddleware, async (req, res) => {
     }
 });
 
-// Admin: delete inactive users (optional email notification before deletion)
+// Admin: delete expired inactive users (optional email notification before deletion)
 router.post('/delete-inactive', requireAdminMiddleware, async (req, res) => {
     try {
         const { maxInactiveDays, minStorageMB, dryRun, sendEmailNotice } = req.body;
@@ -181,6 +182,7 @@ router.post('/delete-inactive', requireAdminMiddleware, async (req, res) => {
 
         for (const [handle, meta] of Object.entries(allMeta)) {
             if (handle === 'default-user') continue;
+            if (!isUserExpired(handle)) continue;
             const lastActive = meta.lastLoginAt || meta.createdAt || 0;
             if (now - lastActive > threshold) {
                 // Skip users with significant data (storage >= minStorageMB)
@@ -189,10 +191,10 @@ router.post('/delete-inactive', requireAdminMiddleware, async (req, res) => {
                     if (usedBytes >= minStorageBytes) continue;
                     const daysInactive = Math.floor((now - lastActive) / 86400000);
                     const usedMiB = Math.round(usedBytes / 1024 / 1024 * 100) / 100;
-                    candidates.push({ handle, lastLoginAt: meta.lastLoginAt, email: meta.email, daysInactive, usedMiB });
+                    candidates.push({ handle, lastLoginAt: meta.lastLoginAt, email: meta.email, expiresAt: meta.expiresAt, daysInactive, usedMiB });
                 } else {
                     const daysInactive = Math.floor((now - lastActive) / 86400000);
-                    candidates.push({ handle, lastLoginAt: meta.lastLoginAt, email: meta.email, daysInactive });
+                    candidates.push({ handle, lastLoginAt: meta.lastLoginAt, email: meta.email, expiresAt: meta.expiresAt, daysInactive });
                 }
             }
         }
@@ -219,7 +221,7 @@ router.post('/delete-inactive', requireAdminMiddleware, async (req, res) => {
                             await sendEmail(
                                 c.email,
                                 `[${siteName}] 您的账号数据已被清理`,
-                                `您好 ${c.handle}，\n\n您在 ${siteName} 的账号已 ${c.daysInactive} 天未登录，根据系统维护政策，该账号的数据已被清理。\n\n如有疑问，${adminContact ? '请联系管理员：' + adminContact : '请联系管理员。'}\n\n— ${siteName} 系统通知`,
+                                `您好 ${c.handle}，\n\n您在 ${siteName} 的账号已过期，且已 ${c.daysInactive} 天未登录/未续费。根据系统维护政策，该账号的数据已被清理。\n\n如有疑问，${adminContact ? '请联系管理员：' + adminContact : '请联系管理员。'}\n\n— ${siteName} 系统通知`,
                                 `<div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif">
   <div style="background:#e74c3c;color:#fff;padding:20px;text-align:center;border-radius:5px 5px 0 0">
     <h1 style="margin:0;font-size:22px">${siteName}</h1>
@@ -227,9 +229,9 @@ router.post('/delete-inactive', requireAdminMiddleware, async (req, res) => {
   </div>
   <div style="background:#f9f9f9;padding:30px;border:1px solid #ddd;border-top:none">
     <p>您好，<strong>${c.handle}</strong>，</p>
-    <p>您在 <strong>${siteName}</strong> 的账号已 <strong>${c.daysInactive} 天</strong>未登录。</p>
+    <p>您在 <strong>${siteName}</strong> 的账号已过期，且已 <strong>${c.daysInactive} 天</strong>未登录/未续费。</p>
     <div style="background:#fdf2f2;border-left:4px solid #e74c3c;padding:15px;margin:20px 0;border-radius:0 5px 5px 0">
-      根据系统维护政策，该账号的所有数据已于今日被清理。如您希望继续使用，请重新注册账号。
+      根据系统维护政策，该账号的所有数据已于今日被清理。如您希望继续使用，请重新注册账号或联系管理员处理续费。
     </div>
     <p style="color:#666;font-size:14px">如您认为这是误操作，或有任何疑问，${contactLine}</p>
     ${siteUrl ? `<p style="color:#666;font-size:14px">平台地址：<a href="${siteUrl}" style="color:#e74c3c">${siteUrl}</a></p>` : ''}
@@ -275,7 +277,7 @@ router.post('/delete-inactive', requireAdminMiddleware, async (req, res) => {
     }
 });
 
-// Admin: send warning emails to inactive users (without deleting)
+// Admin: send warning emails to expired inactive users (without deleting)
 router.post('/warn-inactive', requireAdminMiddleware, async (req, res) => {
     try {
         const { maxInactiveDays, minStorageMB } = req.body;
@@ -293,6 +295,7 @@ router.post('/warn-inactive', requireAdminMiddleware, async (req, res) => {
 
         for (const [handle, meta] of Object.entries(allMeta)) {
             if (handle === 'default-user') continue;
+            if (!isUserExpired(handle)) continue;
             const lastActive = meta.lastLoginAt || meta.createdAt || 0;
             if (now - lastActive > threshold) {
                 // Skip users with significant data
@@ -303,23 +306,23 @@ router.post('/warn-inactive', requireAdminMiddleware, async (req, res) => {
                         ? `<div style="text-align:center;margin:25px 0"><a href="${siteUrl}" style="background:#f39c12;color:#fff;padding:12px 30px;border-radius:5px;text-decoration:none;font-size:15px;display:inline-block">立即登录 ${siteName}</a></div>`
                         : '';
                     const siteUrlLine = siteUrl
-                        ? `请访问 ${siteUrl} 登录您的账号。`
-                        : '请尽快登录您的账号。';
+                        ? `请访问 ${siteUrl} 登录并完成续费，或联系管理员。`
+                        : '请尽快续费或联系管理员。';
                     try {
                         await sendEmail(
                             meta.email,
-                            `[${siteName}] 账号长期未登录提醒，请尽快登录`,
-                            `您好 ${handle}，\n\n您在 ${siteName} 的账号已 ${daysInactive} 天未登录。\n\n为避免账号数据被系统自动清理，请尽快登录。${siteUrl ? '\n\n登录地址：' + siteUrl : ''}\n\n如有疑问，请联系管理员。\n\n— ${siteName} 系统通知`,
+                            `[${siteName}] 账号已过期未续费提醒`,
+                            `您好 ${handle}，\n\n您在 ${siteName} 的账号已过期，且已 ${daysInactive} 天未登录/未续费。\n\n为避免账号数据被系统清理，请尽快续费或联系管理员。${siteUrl ? '\n\n登录地址：' + siteUrl : ''}\n\n如有疑问，请联系管理员。\n\n— ${siteName} 系统通知`,
                             `<div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif">
   <div style="background:#f39c12;color:#fff;padding:20px;text-align:center;border-radius:5px 5px 0 0">
     <h1 style="margin:0;font-size:22px">${siteName}</h1>
-    <p style="margin:8px 0 0;opacity:.9;font-size:14px">账号活跃提醒</p>
+    <p style="margin:8px 0 0;opacity:.9;font-size:14px">账号续费提醒</p>
   </div>
   <div style="background:#f9f9f9;padding:30px;border:1px solid #ddd;border-top:none">
     <p>您好，<strong>${handle}</strong>，</p>
-    <p>您在 <strong>${siteName}</strong> 的账号已 <strong>${daysInactive} 天</strong>未登录。</p>
+    <p>您在 <strong>${siteName}</strong> 的账号已过期，且已 <strong>${daysInactive} 天</strong>未登录/未续费。</p>
     <div style="background:#fff8e1;border-left:4px solid #f39c12;padding:15px;margin:20px 0;border-radius:0 5px 5px 0">
-      <strong>⚠️ 温馨提示：</strong>根据系统维护政策，长期未活跃的账号数据可能会被自动清理。请尽快登录以保留您的数据。
+      <strong>⚠️ 温馨提示：</strong>根据系统维护政策，已过期且长期未续费的账号数据可能会被清理。请尽快续费或联系管理员以保留您的数据。
     </div>
     ${loginLinkHtml}
     <p style="color:#666;font-size:14px">如果按钮无法点击，${siteUrlLine}</p>

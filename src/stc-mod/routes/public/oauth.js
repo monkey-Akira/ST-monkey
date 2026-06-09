@@ -25,6 +25,14 @@ function getCallbackUrl(req, provider) {
     return `${proto}://${host}/api/stc/oauth/${provider}/callback`;
 }
 
+function normalizeQq(value) {
+    return String(value ?? '').trim();
+}
+
+function isValidQq(value) {
+    return /^[1-9][0-9]{4,10}$/.test(value);
+}
+
 // Initiate OAuth flow
 router.get('/:provider', (req, res) => {
     const { provider } = req.params;
@@ -98,55 +106,12 @@ router.get('/:provider/callback', async (req, res) => {
             return res.redirect('/');
         }
 
-        // New user - check if invitation code is required
-        if (invitationService.isEnabled()) {
-            // Redirect to a page where they can enter invite code
-            const encodedInfo = Buffer.from(JSON.stringify({
-                provider, id: userInfo.id, username: userInfo.username,
-                email: userInfo.email, avatar: userInfo.avatar,
-            })).toString('base64');
-            return res.redirect(`/register?oauth=${encodeURIComponent(encodedInfo)}`);
-        }
-
-        // Create new user directly
-        const safeUsername = typeof userInfo.username === 'string' && userInfo.username.trim()
-            ? userInfo.username
-            : `user-${userInfo.id}`;
-        const handle = safeUsername.toLowerCase()
-            .replace(/[^a-z0-9-]/g, '-')
-            .replace(/-+/g, '-')
-            .substring(0, 32);
-        const result = await createUser(handle, safeUsername, '');
-
-        if (!result.success) {
-            return res.status(400).send(`创建用户失败: ${result.error}`);
-        }
-
-        const userHandle = String(result.handle);
-
-        setUserMeta(userHandle, {
-            oauthProvider: providerStr,
-            oauthUserId: String(userInfo.id),
-            email: userInfo.email || null,
-            avatar: userInfo.avatar || null,
-            expiresAt: 0,
-            createdAt: Date.now(),
-            lastLoginAt: Date.now(),
-            storageLimitMiB: isStorageLimitEnabled() ? getDefaultLimitMiB() : undefined,
-        });
-
-        if (getTemplateMeta()) {
-            try { applyTemplate(userHandle); } catch {}
-        }
-
-        try { applyMonkeyApiDefaults(userHandle); }
-        catch (e) { console.error('[STC-MOD] Apply Monkey API defaults failed:', e.message); }
-
-        if (req.session) {
-            req.session.handle = userHandle;
-        }
-
-        return res.redirect('/');
+        // New user - collect required registration annotations on the registration page.
+        const encodedInfo = Buffer.from(JSON.stringify({
+            provider, id: userInfo.id, username: userInfo.username,
+            email: userInfo.email, avatar: userInfo.avatar,
+        })).toString('base64');
+        return res.redirect(`/register?oauth=${encodeURIComponent(encodedInfo)}`);
     } catch (error) {
         console.error('[STC-MOD] OAuth callback error:', error);
         res.status(500).send('OAuth 登录失败: ' + error.message);
@@ -156,10 +121,15 @@ router.get('/:provider/callback', async (req, res) => {
 // Complete OAuth registration with invite code
 router.post('/complete-registration', async (req, res) => {
     try {
-        const { provider, id, username, email, avatar, inviteCode } = req.body;
+        const { provider, id, username, email, avatar, inviteCode, qq } = req.body;
 
         if (!provider || !id) {
             return res.status(400).json({ error: '缺少必要参数' });
+        }
+
+        const qqNumber = normalizeQq(qq);
+        if (!isValidQq(qqNumber)) {
+            return res.status(400).json({ error: '请填写有效的QQ号' });
         }
 
         const providerStr = String(provider);
@@ -197,6 +167,7 @@ router.post('/complete-registration', async (req, res) => {
         setUserMeta(userHandle, {
             oauthProvider: providerStr,
             oauthUserId: idStr,
+            qq: qqNumber,
             email: email || null,
             avatar: avatar || null,
             expiresAt,

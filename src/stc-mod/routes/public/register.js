@@ -25,6 +25,14 @@ function normalizeHandle(name) {
         .substring(0, 32) || 'user';
 }
 
+function normalizeQq(value) {
+    return String(value ?? '').trim();
+}
+
+function isValidQq(value) {
+    return /^[1-9][0-9]{4,10}$/.test(value);
+}
+
 const WEAK_NAMES = ['admin', 'root', 'system', 'test', 'null', 'undefined', 'default', 'default-user'];
 
 // Send email verification code
@@ -66,10 +74,15 @@ router.post('/send-verification', async (req, res) => {
 // User registration
 router.post('/register', async (req, res) => {
     try {
-        const { name, password, inviteCode, email, verificationCode } = req.body;
+        const { name, password, qq, inviteCode, email, verificationCode } = req.body;
 
         if (!name || typeof name !== 'string' || name.trim().length < 2) {
             return res.status(400).json({ error: '用户名至少需要2个字符' });
+        }
+
+        const qqNumber = normalizeQq(qq);
+        if (!isValidQq(qqNumber)) {
+            return res.status(400).json({ error: '请填写有效的QQ号' });
         }
 
         const handle = normalizeHandle(name.trim());
@@ -123,6 +136,7 @@ router.post('/register', async (req, res) => {
 
         // Save extended user metadata
         setUserMeta(handle, {
+            qq: qqNumber,
             email: email || null,
             expiresAt,
             createdAt: Date.now(),

@@ -42,6 +42,7 @@ function saveMetadata() {
 
 /**
  * @typedef {Object} UserExtendedData
+ * @property {string} [qq] - User QQ number
  * @property {string} [email] - User email
  * @property {string} [oauthProvider] - OAuth provider name (github/discord/linuxdo)
  * @property {string} [oauthUserId] - OAuth user ID from provider

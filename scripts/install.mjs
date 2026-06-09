@@ -160,7 +160,8 @@ function mergeConfigText(configPath) {
 
     const replacements = [
         [/^listen:\s*false$/m, 'listen: true'],
-        [/^basicAuthMode:\s*false$/m, 'basicAuthMode: true'],
+        [/^whitelistMode:\s*true$/m, 'whitelistMode: false'],
+        [/^basicAuthMode:\s*true$/m, 'basicAuthMode: false'],
         [/^enableUserAccounts:\s*false$/m, 'enableUserAccounts: true'],
         [/^enableDiscreetLogin:\s*false$/m, 'enableDiscreetLogin: true'],
     ];
@@ -218,10 +219,6 @@ userStorage:
   enabled: true
   defaultLimitMiB: 500
   dailyCheckInMiB: 0
-
-extensions:
-  enabled: true
-  autoUpdate: false
 
 privacy:
   secretsVault:

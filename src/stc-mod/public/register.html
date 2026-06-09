@@ -336,6 +336,15 @@
             <div id="pwdStrengthBar"><div id="pwdStrengthFill"></div></div>
         </div>
 
+        <div class="field">
+            <div class="field-label">
+                <i class="fa-brands fa-qq"></i> QQ号 <span class="req">*</span>
+            </div>
+            <input type="text" id="regQq" placeholder="填写QQ号" inputmode="numeric" autocomplete="off"
+                   minlength="5" maxlength="11" pattern="[1-9][0-9]{4,10}" required>
+            <div class="field-hint">用于用户标注，后续机器人插件可按此字段关联用户</div>
+        </div>
+
         <!-- ── Invitation Code (shown when enabled) ── -->
         <div id="inviteCodeSection" style="display:none">
             <div class="divider">邀请 / 激活码</div>
@@ -514,11 +523,17 @@ document.getElementById('registerForm').addEventListener('submit', async () => {
     clearMessages();
     const name             = document.getElementById('regName').value.trim();
     const password         = document.getElementById('regPassword').value;
+    const qq               = document.getElementById('regQq').value.trim();
     const inviteCode       = document.getElementById('regInviteCode').value.trim();
     const email            = document.getElementById('regEmail').value.trim();
     const verificationCode = document.getElementById('regVerCode').value.trim();
 
     if (!name || name.length < 2) { showError('用户名至少需要2个字符'); return; }
+    if (!/^[1-9][0-9]{4,10}$/.test(qq)) {
+        showError('请填写有效的QQ号');
+        document.getElementById('regQq').focus();
+        return;
+    }
     if (stcConfig.enableInvitationCodes && !inviteCode) {
         showError('请输入激活码（注册必须填写）');
         document.getElementById('regInviteCode').focus();
@@ -537,7 +552,7 @@ document.getElementById('registerForm').addEventListener('submit', async () => {
         try {
             const resp = await fetch('/api/stc/oauth/complete-registration', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...window._oauthData, inviteCode }),
+                body: JSON.stringify({ ...window._oauthData, inviteCode, qq }),
             });
             const data = await resp.json();
             if (data.success) {
@@ -560,7 +575,7 @@ document.getElementById('registerForm').addEventListener('submit', async () => {
         const resp = await fetch('/api/stc/users/register', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                name, password,
+                name, password, qq,
                 inviteCode:       inviteCode       || undefined,
                 email:            email            || undefined,
                 verificationCode: verificationCode || undefined,

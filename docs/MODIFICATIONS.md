@@ -366,8 +366,8 @@ enableDownloadableTokenizers: false
 | POST | `/api/stc/user-storage/delete-code` | 删除存储激活码 |
 | GET | `/api/stc/users/all-meta` | 所有用户扩展元数据 |
 | GET | `/api/stc/users/expiration-list` | 用户过期列表 |
-| POST | `/api/stc/users/delete-inactive` | 彻底删除长期未登录用户（账号+数据目录+元数据），支持 `dryRun` 预览、`minStorageMB` 存储过滤、`sendEmailNotice` 通知 |
-| POST | `/api/stc/users/warn-inactive` | 向未登录用户发送提醒邮件（不删除），支持 `minStorageMB` 存储过滤 |
+| POST | `/api/stc/users/delete-inactive` | 彻底删除超期未续费用户（账号+数据目录+元数据），仅匹配已过期用户，支持 `dryRun` 预览、`minStorageMB` 存储过滤、`sendEmailNotice` 通知 |
+| POST | `/api/stc/users/warn-inactive` | 向超期未续费用户发送提醒邮件（不删除），仅匹配已过期用户，支持 `minStorageMB` 存储过滤 |
 | GET | `/api/stc/announcements/list` | 所有公告列表 |
 | POST | `/api/stc/announcements/create` | 创建公告 |
 | PUT | `/api/stc/announcements/:id` | 更新公告 |

@@ -406,6 +406,7 @@ function renderUserList() {
                         ${u.lastChatTime ? `<span style="color:#8ab4f8"><i class="fa-solid fa-message"></i> 最后对话: ${formatRelativeTime(u.lastChatTime)}</span>` : ''}
                         ${u.expiresAt ? `<span><i class="fa-solid fa-calendar"></i> 到期: ${new Date(u.expiresAt).toLocaleDateString('zh-CN')}</span>` : ''}
                     </div>
+                    ${u.qq ? `<div style="margin-top:2px"><i class="fa-brands fa-qq"></i> QQ: ${esc(u.qq)}</div>` : ''}
                     ${u.email ? `<div style="margin-top:2px"><i class="fa-solid fa-envelope"></i> ${esc(u.email)}</div>` : ''}
                 </div>
             </div>
@@ -1173,9 +1174,9 @@ async function renderStorageTab(container) {
 }
 
 // ═══════════════════════════════════════════════════
-// TAB: 用户管理（存储分析 + 删除不活跃用户）
+// TAB: 用户管理（存储分析 + 删除超期未续费用户）
 // ═══════════════════════════════════════════════════
-// TAB: 用户管理（存储分析 + 删除不活跃用户）
+// TAB: 用户管理（存储分析 + 删除超期未续费用户）
 // ═══════════════════════════════════════════════════
 async function renderUsersTab(container) {
     container.innerHTML = `
@@ -1190,19 +1191,19 @@ async function renderUsersTab(container) {
         <div style="text-align:center;padding:24px;color:#888"><i class="fa-solid fa-spinner fa-spin"></i> 加载中...</div>
       </div>
 
-      <!-- Section: Delete Inactive Users -->
+      <!-- Section: Delete Expired Unrenewed Users -->
       <div style="border-top:1px solid #2a3a5e;padding-top:20px">
-        <h3 style="margin:0 0 14px"><i class="fa-solid fa-user-slash" style="color:#e74c3c;margin-right:6px"></i>清理长期未登录用户</h3>
+        <h3 style="margin:0 0 14px"><i class="fa-solid fa-user-slash" style="color:#e74c3c;margin-right:6px"></i>清理超期未续费用户</h3>
 
         <div style="background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:12px;margin-bottom:16px;font-size:.85em;color:#e88">
           <i class="fa-solid fa-triangle-exclamation"></i>
-          <strong>此操作不可逆！</strong>将彻底删除不活跃用户的 SillyTavern 账号及其全部数据（聊天记录、角色卡、世界书、备份等），以释放存储空间。
+          <strong>此操作不可逆！</strong>将彻底删除已过期且长期未续费用户的 SillyTavern 账号及其全部数据（聊天记录、角色卡、世界书、备份等），以释放存储空间。
           强烈建议先使用"预览"确认名单后再执行删除。
         </div>
 
         <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:10px">
           <div>
-            <div style="font-size:.8em;color:#888;margin-bottom:4px">超过多少天未登录视为不活跃:</div>
+            <div style="font-size:.8em;color:#888;margin-bottom:4px">账号过期后超过多少天未登录/未续费:</div>
             <div style="display:flex;align-items:center;gap:6px">
               <input id="stc-inactive-days" type="number" value="30" min="1" max="3650"
                 style="padding:7px 10px;border-radius:6px;border:1px solid #333;background:#0f3460;color:#eee;width:80px">
@@ -1220,7 +1221,7 @@ async function renderUsersTab(container) {
         </div>
         <div style="font-size:.8em;color:#aaa;margin-bottom:12px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:6px;border-left:2px solid #4a90e2">
           <i class="fa-solid fa-circle-info" style="margin-right:4px"></i>
-          同时满足以上两个条件才会被列为候选：未登录天数超过阈值 <strong>且</strong> 存储占用低于阈值。
+          同时满足以上条件才会被列为候选：账号已过期、未登录/未续费天数超过阈值 <strong>且</strong> 存储占用低于阈值。
           存储量较大的用户（可能有重要数据）将被自动排除。
         </div>
         <div style="margin-bottom:14px">
@@ -1700,7 +1701,7 @@ function renderInactivePreview(candidates, page) {
     const resultDiv = document.getElementById('stc-inactive-preview-result');
     if (!resultDiv) return;
     if (!_inactiveCandidates.length) {
-        resultDiv.innerHTML = `<div style="color:#27ae60;padding:12px"><i class="fa-solid fa-check-circle"></i> 未找到符合条件的不活跃用户</div>`;
+        resultDiv.innerHTML = `<div style="color:#27ae60;padding:12px"><i class="fa-solid fa-check-circle"></i> 未找到符合条件的超期未续费用户</div>`;
         return;
     }
 
@@ -1715,7 +1716,7 @@ function renderInactivePreview(candidates, page) {
         <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:14px">
           <div style="font-weight:600;margin-bottom:10px;color:#f39c12;display:flex;align-items:center;gap:8px">
             <i class="fa-solid fa-user-clock"></i>
-            <span>找到 ${all.length} 个不活跃用户
+            <span>找到 ${all.length} 个超期未续费用户
               （显示 ${start + 1}–${Math.min(start + INACTIVE_PER_PAGE, all.length)}）</span>
           </div>
           ${pager}
@@ -1724,7 +1725,7 @@ function renderInactivePreview(candidates, page) {
             <thead><tr style="color:#888;border-bottom:1px solid #333">
               <th style="padding:6px 8px;text-align:left">用户名</th>
               <th style="padding:6px 8px;text-align:left">最后登录</th>
-              <th style="padding:6px 8px;text-align:right">未登录天数</th>
+              <th style="padding:6px 8px;text-align:right">超期未续费天数</th>
               <th style="padding:6px 8px;text-align:right">存储占用</th>
               <th style="padding:6px 8px;text-align:left">邮箱</th>
             </tr></thead>
@@ -1777,7 +1778,7 @@ async function deleteInactiveUsers() {
     const minStorage = parseFloat(document.getElementById('stc-inactive-min-storage')?.value) || 0;
     const sendEmail = !!document.getElementById('stc-inactive-send-email')?.checked;
     const storageDesc = minStorage > 0 ? `且存储占用 < ${minStorage} MB` : '';
-    if (!confirm(`⚠ 危险操作！确定要彻底删除超过 ${days} 天未登录${storageDesc}的用户吗？\n\n这将永久清除这些用户的 SillyTavern 账号及其所有数据（聊天记录、角色卡、世界书、备份等），操作不可恢复！${sendEmail ? '\n\n（将同时发送删除通知邮件）' : ''}`)) return;
+    if (!confirm(`⚠ 危险操作！确定要彻底删除已过期且超过 ${days} 天未登录/未续费${storageDesc}的用户吗？\n\n有效期内用户不会被清理。这将永久清除候选用户的 SillyTavern 账号及其所有数据（聊天记录、角色卡、世界书、备份等），操作不可恢复！${sendEmail ? '\n\n（将同时发送删除通知邮件）' : ''}`)) return;
     const btn = document.getElementById('stc-inactive-delete');
     if (btn) { btn.disabled = true; btn._orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 处理中...'; }
     try {
@@ -1787,7 +1788,7 @@ async function deleteInactiveUsers() {
         });
         if (!r.ok) throw new Error((await r.json())?.error);
         const d = await r.json();
-        let msg = `已彻底删除 ${d.deleted} 个不活跃用户（账号及全部数据已清除）`;
+        let msg = `已彻底删除 ${d.deleted} 个超期未续费用户（账号及全部数据已清除）`;
         if (sendEmail && d.emailResults) {
             msg += `\n邮件通知：发送 ${d.emailResults.sent} 封，跳过 ${d.emailResults.skipped} 人`;
         }

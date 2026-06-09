@@ -19,6 +19,7 @@ import { shouldSkipCsrf as csrfCheck } from './middleware/csrf-exemption.js';
 import { expirationCheckMiddleware } from './middleware/expiration-check.js';
 import { registerStorageEnforceMiddleware } from './middleware/storage-enforce.js';
 import { isUserExpired } from './user-metadata.js';
+import { ensureDefaultUserPassword as ensureDefaultUserPasswordValue } from './services/default-user-password.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +36,13 @@ getStcDataDir();
  */
 export function shouldSkipCsrf(req) {
     return csrfCheck(req);
+}
+
+/**
+ * Ensure default-user has an internal password before SillyTavern security checks run.
+ */
+export async function ensureDefaultUserPassword() {
+    await ensureDefaultUserPasswordValue();
 }
 
 /**

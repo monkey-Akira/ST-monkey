@@ -71,7 +71,7 @@ git --version
 
 如果你已经把 STC-MOD-Standalone 上传到 Git 仓库：
 
-git clone 你的仓库地址 STC-MOD-Standalone
+git clone https://github.com/monkey-Akira/ST-monkey.git
 cd STC-MOD-Standalone
 
 如果你是手动上传压缩包：

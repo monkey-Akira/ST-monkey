@@ -701,6 +701,13 @@ function buildUserPanelContent(purchaseLink = '') {
             <span style="margin-left:auto;opacity:.35;font-size:.85em">未绑定</span>
         </div>`);
     }
+    if (me.qq) {
+        infoRows.push(`<div style="${ROW}">
+            <i class="fa-brands fa-qq" style="${ICON}"></i>
+            <span style="opacity:.7;flex-shrink:0">QQ</span>
+            <span style="margin-left:auto;font-size:.9em;opacity:.9">${esc(me.qq)}</span>
+        </div>`);
+    }
     // Registration date
     if (me.createdAt) {
         infoRows.push(`<div style="${ROW}">
