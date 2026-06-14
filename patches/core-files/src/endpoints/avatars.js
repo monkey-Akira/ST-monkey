@@ -34,6 +34,10 @@ async function cropResizeAvatar(jimp, crop, mime = JimpMime.jpeg) {
     }
 
     image.cover({ w: finalWidth, h: finalHeight });
+    if (mime === JimpMime.jpeg) {
+        return await image.getBuffer(mime, { jpegColorSpace: 'rgb' });
+    }
+
     return await image.getBuffer(mime);
 }
 
