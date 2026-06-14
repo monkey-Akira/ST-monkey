@@ -1004,6 +1004,7 @@ async function renderTemplateTab(container) {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;font-size:.85em">
           ${[
+            ['avatars','User Avatars','Persona','default'],
             ['settings','settings.json','核心','default'],
             ['secrets','secrets.json','核心','default'],
             ['characters','默认角色卡','内容','default'],
@@ -1058,6 +1059,7 @@ async function renderTemplateTab(container) {
         if (!sourceHandle) { toast('请选择来源用户', true); return; }
         const getCheck = id => !!document.getElementById(`stc-tpl-${id}`)?.checked;
         const options = {
+            includeAvatars: getCheck('avatars'),
             includeSettings: getCheck('settings'),
             includeSecrets: getCheck('secrets'),
             includePresets: getCheck('presets'),

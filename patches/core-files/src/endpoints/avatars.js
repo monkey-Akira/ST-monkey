@@ -14,7 +14,7 @@ import { AVATAR_HEIGHT, AVATAR_WIDTH } from '../constants.js';
 
 export const router = express.Router();
 
-async function cropResizeAvatarAsJpeg(jimp, crop) {
+async function cropResizeAvatar(jimp, crop, mime = JimpMime.jpeg) {
     if (!(jimp instanceof Jimp)) {
         throw new TypeError('Expected a Jimp instance');
     }
@@ -34,7 +34,23 @@ async function cropResizeAvatarAsJpeg(jimp, crop) {
     }
 
     image.cover({ w: finalWidth, h: finalHeight });
-    return await image.getBuffer(JimpMime.jpeg);
+    return await image.getBuffer(mime);
+}
+
+function getAvatarUploadTarget(overwriteName) {
+    if (overwriteName) {
+        const filename = sanitize(overwriteName);
+        const ext = path.extname(filename).toLowerCase();
+        return {
+            filename: ext ? filename : `${filename}.jpg`,
+            mime: ext === '.png' ? JimpMime.png : JimpMime.jpeg,
+        };
+    }
+
+    return {
+        filename: `${Date.now()}.jpg`,
+        mime: JimpMime.jpeg,
+    };
 }
 
 router.post('/get', function (request, response) {
@@ -67,8 +83,9 @@ router.post('/upload', getFileNameValidationFunction('overwrite_name'), async (r
     try {
         const pathToUpload = path.join(request.file.destination, request.file.filename);
         const crop = tryParse(request.query.crop);
+        const target = getAvatarUploadTarget(request.body.overwrite_name);
         const rawImg = await Jimp.read(pathToUpload);
-        const image = await cropResizeAvatarAsJpeg(rawImg, crop);
+        const image = await cropResizeAvatar(rawImg, crop, target.mime);
 
         // Remove previous thumbnail and bust cache if overwriting
         if (request.body.overwrite_name) {
@@ -76,8 +93,7 @@ router.post('/upload', getFileNameValidationFunction('overwrite_name'), async (r
             cacheBuster.bust(request, response);
         }
 
-        const requestedName = sanitize(request.body.overwrite_name || `${Date.now()}.jpg`);
-        const filename = requestedName.replace(/\.[^.]+$/, '') + '.jpg';
+        const filename = target.filename;
         const pathToNewFile = path.join(request.user.directories.avatars, filename);
         writeFileAtomicSync(pathToNewFile, image);
         fs.unlinkSync(pathToUpload);

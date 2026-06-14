@@ -36,6 +36,7 @@ export function saveTemplate(sourceHandle, options = {}) {
         includeSecrets = false,
         includePresets = true,
         includeRegex = true,
+        includeAvatars = true,
         includeCharacters = false,
         includeWorlds = false,
         includeThemes = true,
@@ -82,6 +83,7 @@ export function saveTemplate(sourceHandle, options = {}) {
 
     if (includeSettings) copyFile('settings.json');
     if (includeSecrets) copyFile('secrets.json');
+    if (includeAvatars) copyDir('avatars');
     if (includePresets) {
         copyDir('TextGen Settings');
         copyDir('OpenAI Settings');
