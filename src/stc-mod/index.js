@@ -129,6 +129,10 @@ export async function setupPublicApi(app) {
     const { router: publicConfigRouter } = await import('./routes/public/public-config.js');
     app.use('/api/stc/public-config', publicConfigRouter);
 
+    // Token-protected public character sync receiver (external distribution service)
+    const { router: publicCharactersSyncRouter } = await import('./routes/public/public-characters-sync.js');
+    app.use('/api/stc/public-characters', publicCharactersSyncRouter);
+
     console.log('[STC-MOD] Public API routes registered.');
 }
 

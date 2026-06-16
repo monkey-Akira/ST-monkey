@@ -82,6 +82,11 @@ export function ensureDefaultConfig() {
         enableInvitationCodes: false,
         enableForum: false,
         enablePublicCharacters: false,
+        publicCharactersSync: {
+            enabled: false,
+            tavernId: '',
+            token: '',
+        },
         purchaseLink: '',
         oauth: {
             github: { enabled: false, clientId: '', clientSecret: '', callbackUrl: '' },

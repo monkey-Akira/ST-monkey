@@ -225,6 +225,10 @@ function mergeConfigText(configPath) {
 enableInvitationCodes: false
 enableForum: true
 enablePublicCharacters: true
+publicCharactersSync:
+  enabled: false
+  tavernId: ''
+  token: ''
 purchaseLink: ''
 
 oauth:

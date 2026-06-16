@@ -400,6 +400,10 @@ enableServerPluginsAutoUpdate: true
 enableInvitationCodes: false    # 启用邀请码系统
 enableForum: true              # 启用论坛
 enablePublicCharacters: true   # 启用公共角色卡库
+publicCharactersSync:
+  enabled: false                # 启用外部角色卡分发接收接口
+  tavernId: ''                  # 当前酒馆在分发平台中的稳定 ID
+  token: ''                     # 分发平台调用本酒馆同步接口的密钥
 purchaseLink: ''                # 续费购买链接
 
 oauth:
