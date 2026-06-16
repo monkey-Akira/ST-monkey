@@ -6,7 +6,9 @@ import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import sanitize from 'sanitize-filename';
 import { getStcConfig, getStcDataDir } from '../../config.js';
+import { getAllUserHandles, getUserDirectories } from '../../../users.js';
 
 export const router = express.Router();
 
@@ -95,12 +97,77 @@ function normalizeCardData(value, fallbackName) {
     return { name: fallbackName || 'character' };
 }
 
+function getFallbackAvatarPath() {
+    return path.resolve(process.cwd(), 'public', 'img', 'ai4.png');
+}
+
+async function writeCharacterToUser(handle, payload) {
+    const users = await getAllUserHandles();
+    if (!users.includes(handle)) {
+        const error = new Error('Target user does not exist');
+        error.status = 404;
+        throw error;
+    }
+
+    const name = String(payload.name || '').trim();
+    const cardData = normalizeCardData(payload.cardData, name || 'character');
+    const userDirs = getUserDirectories(handle);
+    if (!fs.existsSync(userDirs.characters)) fs.mkdirSync(userDirs.characters, { recursive: true });
+    if (!fs.existsSync(userDirs.chats)) fs.mkdirSync(userDirs.chats, { recursive: true });
+
+    let avatarBuffer = null;
+    if (payload.sourceFileDataUrl) {
+        avatarBuffer = decodeDataUrl(payload.sourceFileDataUrl, ['image/png']);
+        if (avatarBuffer?.length > 30 * 1024 * 1024) {
+            const error = new Error('Source PNG is too large');
+            error.status = 400;
+            throw error;
+        }
+    }
+
+    if (!avatarBuffer?.length) {
+        const fallback = getFallbackAvatarPath();
+        if (!fs.existsSync(fallback)) {
+            const error = new Error('Default avatar file is missing');
+            error.status = 500;
+            throw error;
+        }
+        avatarBuffer = fs.readFileSync(fallback);
+    }
+
+    const { write } = await import('../../../character-card-parser.js');
+    const timestamp = Date.now();
+    const baseName = sanitize(cardData?.data?.name || cardData?.name || name || 'character') || 'character';
+    const fileName = sanitize(`${baseName}_${timestamp}`) || `character_${timestamp}`;
+    const outPath = path.join(userDirs.characters, `${fileName}.png`);
+    const newPng = write(avatarBuffer, JSON.stringify(cardData));
+    fs.writeFileSync(outPath, newPng);
+
+    const chatsPath = path.join(userDirs.chats, fileName);
+    if (!fs.existsSync(chatsPath)) fs.mkdirSync(chatsPath, { recursive: true });
+
+    return { handle, fileName };
+}
+
 router.get('/sync-health', requireSyncToken, (req, res) => {
     res.json({
         success: true,
         tavernId: tavernId() || null,
         publicCharactersSync: true,
     });
+});
+
+router.get('/sync-users', requireSyncToken, async (req, res) => {
+    try {
+        const handles = await getAllUserHandles();
+        res.json({
+            success: true,
+            tavernId: tavernId() || null,
+            users: handles.map(handle => ({ handle, name: handle })),
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 router.post('/sync', express.json({ limit: JSON_LIMIT }), requireSyncToken, (req, res) => {
@@ -165,6 +232,24 @@ router.post('/sync', express.json({ limit: JSON_LIMIT }), requireSyncToken, (req
         res.json({ success: true, character: entry });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/sync-to-user', express.json({ limit: JSON_LIMIT }), requireSyncToken, async (req, res) => {
+    try {
+        const targetUserHandle = String(req.body.targetUserHandle || '').trim();
+        if (!targetUserHandle) return res.status(400).json({ error: 'Missing targetUserHandle' });
+
+        const centralId = String(req.body.centralId || '').trim();
+        if (!centralId) return res.status(400).json({ error: 'Missing centralId' });
+
+        const name = String(req.body.name || '').trim();
+        if (!name) return res.status(400).json({ error: 'Missing name' });
+
+        const result = await writeCharacterToUser(targetUserHandle, req.body);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        res.status(error.status || 500).json({ error: error.message });
     }
 });
 
