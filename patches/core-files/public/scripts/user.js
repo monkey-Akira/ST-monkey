@@ -1047,7 +1047,48 @@ async function extendUserSession() {
     }
 }
 
+/**
+ * Prevent regular users from opening the original character-card PNG by
+ * clicking a character avatar in chat. User persona and system avatars are
+ * intentionally left unchanged.
+ * @param {MouseEvent} event Click event
+ */
+function preventCharacterCardAvatarOpen(event) {
+    if (!accountsEnabled || isAdmin()) {
+        return;
+    }
+
+    if (!(event.target instanceof Element)) {
+        return;
+    }
+
+    const avatar = event.target.closest('.mes .avatar');
+    const message = avatar?.closest('.mes');
+    if (!message) {
+        return;
+    }
+
+    const isUserMessage = message.getAttribute('is_user') === 'true';
+    if (isUserMessage) {
+        return;
+    }
+
+    const avatarUrl = avatar.querySelector('img')?.getAttribute('src') || '';
+    const isCharacterAvatar = avatarUrl.includes('/thumbnail?type=avatar') || avatarUrl.startsWith('/characters/');
+    if (!isCharacterAvatar) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+}
+
 jQuery(() => {
+    // Capture the click before SillyTavern's delegated chat-avatar handler can
+    // replace the thumbnail URL with /characters/<name>.png.
+    document.addEventListener('click', preventCharacterCardAvatarOpen, true);
+
     $('#logout_button').on('click', () => {
         logout();
     });
