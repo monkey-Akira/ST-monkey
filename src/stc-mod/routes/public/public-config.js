@@ -12,7 +12,7 @@ router.get('/public-pages', (req, res) => {
     res.json({
         enableForum: !!getStcConfig('enableForum', false),
         enablePublicCharacters: !!getStcConfig('enablePublicCharacters', false),
-        enableInvitationCodes: !!getStcConfig('enableInvitationCodes', false),
+        enableInvitationCodes: !!getStcConfig('enableInvitationCodes', true),
         enableEmailVerification: isEmailServiceAvailable(),
         enableOAuthGithub: !!getStcConfig('oauth.github.enabled', false),
         enableOAuthDiscord: !!getStcConfig('oauth.discord.enabled', false),

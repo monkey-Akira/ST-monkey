@@ -79,7 +79,7 @@ export function setStcConfig(key, value) {
  */
 export function ensureDefaultConfig() {
     const defaults = {
-        enableInvitationCodes: false,
+        enableInvitationCodes: true,
         enableForum: false,
         enablePublicCharacters: false,
         publicCharactersSync: {

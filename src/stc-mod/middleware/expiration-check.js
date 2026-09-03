@@ -12,7 +12,7 @@ import { getStcConfig } from '../config.js';
  */
 export function expirationCheckMiddleware(req, res, next) {
     // Only check if invitation codes (subscription) system is enabled
-    if (!getStcConfig('enableInvitationCodes', false)) {
+    if (!getStcConfig('enableInvitationCodes', true)) {
         return next();
     }
 

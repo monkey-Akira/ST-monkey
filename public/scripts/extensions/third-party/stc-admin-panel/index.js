@@ -19,6 +19,28 @@ async function getCsrfHeaders() {
     return h;
 }
 
+function applyExtensionManagementPermissions() {
+    const styleId = 'stc-admin-only-extension-actions';
+    const existingStyle = document.getElementById(styleId);
+
+    if (isAdmin) {
+        existingStyle?.remove();
+        return;
+    }
+
+    if (existingStyle) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = '#third_party_extension_button,\n' +
+        '.assets-install-hint-link,\n' +
+        '.extensions_info .extension_block .btn_update,\n' +
+        '.extensions_info > .extensions_toolbar > button:nth-of-type(-n + 2) {\n' +
+        '    display: none !important;\n' +
+        '}';
+    document.head.appendChild(style);
+}
+
 // ── Storage quota global fetch interceptor ────────────────────
 // Wrap the native fetch so any 507 response shows a persistent toast.
 (function installStorageGuard() {
@@ -179,6 +201,8 @@ jQuery(async () => {
     } catch (e) {
         console.debug('[STC-MOD] Could not fetch user profile:', e.message);
     }
+
+    applyExtensionManagementPermissions();
 
     // Step 2: Inject admin panel entry buttons if admin
     if (isAdmin) {

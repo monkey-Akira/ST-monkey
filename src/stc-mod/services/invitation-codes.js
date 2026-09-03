@@ -64,7 +64,7 @@ function getDurationMs(durationType) {
 }
 
 export function isEnabled() {
-    return !!getStcConfig('enableInvitationCodes', false);
+    return !!getStcConfig('enableInvitationCodes', true);
 }
 
 export function createInvitationCode(createdBy, durationType = 'permanent') {

@@ -32,6 +32,7 @@ import {
     getUserDirectoriesList,
     migrateSystemPrompts,
     migrateUserData,
+    requireAdminMiddleware,
     requireLoginMiddleware,
     setUserDataMiddleware,
     shouldRedirectToLogin,
@@ -306,6 +307,11 @@ app.get('/version', async function (_, response) {
 });
 
 redirectDeprecatedEndpoints(app);
+
+// [STC-MOD] Only administrators may install or update extensions.
+app.use('/api/extensions/install', requireAdminMiddleware);
+app.use('/api/extensions/update', requireAdminMiddleware);
+
 setupPrivateEndpoints(app);
 
 // [STC-MOD] Private routes (requires authentication)

@@ -8,7 +8,7 @@ import { getPurchaseLink } from '../../services/invitation-codes.js';
 export const router = express.Router();
 
 router.get('/status', (req, res) => {
-    const enabled = !!getStcConfig('enableInvitationCodes', false);
+    const enabled = !!getStcConfig('enableInvitationCodes', true);
     res.json({
         enabled,
         purchaseLink: enabled ? getPurchaseLink() : undefined,

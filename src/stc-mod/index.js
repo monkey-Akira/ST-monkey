@@ -63,7 +63,7 @@ export async function setupPublicRoutes(app) {
     app.get('/', (req, res, next) => {
         if (req.session?.handle) {
             // If invitation code system is enabled, kick expired users back to login
-            if (getStcConfig('enableInvitationCodes', false) && isUserExpired(req.session.handle)) {
+            if (getStcConfig('enableInvitationCodes', true) && isUserExpired(req.session.handle)) {
                 const handle = req.session.handle;
                 req.session = null; // destroy session
                 return res.redirect(`/login?reason=expired&handle=${encodeURIComponent(handle)}`);
@@ -132,6 +132,10 @@ export async function setupPublicApi(app) {
     // Token-protected public character sync receiver (external distribution service)
     const { router: publicCharactersSyncRouter } = await import('./routes/public/public-characters-sync.js');
     app.use('/api/stc/public-characters', publicCharactersSyncRouter);
+
+    // Token-protected user preset and theme sync receiver.
+    const { router: userJsonResourcesSyncRouter } = await import('./routes/public/user-json-resources-sync.js');
+    app.use('/api/stc/user-json-resources', userJsonResourcesSyncRouter);
 
     console.log('[STC-MOD] Public API routes registered.');
 }

@@ -222,7 +222,7 @@ function mergeConfigText(configPath) {
         text += `
 
 # -- STC-MOD CONFIGURATION --
-enableInvitationCodes: false
+enableInvitationCodes: true
 enableForum: true
 enablePublicCharacters: true
 publicCharactersSync:

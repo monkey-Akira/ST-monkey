@@ -37,6 +37,11 @@
 - Public characters:
   - `src/stc-mod/public/public-characters.html`
   - `src/stc-mod/routes/private/public-characters.js`
+  - `src/stc-mod/routes/public/public-characters-sync.js`
+- User JSON resource sync:
+  - `src/stc-mod/routes/public/user-json-resources-sync.js`
+  - Writes chat completion presets to `OpenAI Settings/`
+  - Writes UI themes to `themes/`
 - Default user template:
   - `src/stc-mod/services/default-template.js`
   - `src/stc-mod/routes/private/default-config.js`

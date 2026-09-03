@@ -252,7 +252,7 @@ src/stc-mod/
 在 `config.yaml` 中添加的配置项（首次启动时自动写入默认值）：
 
 ```yaml
-enableInvitationCodes: false    # 启用邀请码系统
+enableInvitationCodes: true    # 启用邀请码系统
 enableForum: false              # 启用论坛
 enablePublicCharacters: false   # 启用公共角色卡库
 purchaseLink: ''                # 续费购买链接
